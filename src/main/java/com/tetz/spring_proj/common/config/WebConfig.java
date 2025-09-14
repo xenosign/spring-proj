@@ -13,7 +13,7 @@ public class WebConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")  // 엔드 포인트
-                        .allowedOrigins("http://localhost:3000", "http://localhost:5173") // Origin
+                        .allowedOrigins("*", "http://localhost:3000", "http://localhost:5173") // Origin
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // 메서드
                         .allowedHeaders("*") // 헤더
                         .allowCredentials(true); // 인증정보
