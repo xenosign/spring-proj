@@ -6,7 +6,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-public class WebConfig {
+public class CorsConfig {
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {
@@ -15,8 +15,7 @@ public class WebConfig {
                 registry.addMapping("/**")  // 엔드 포인트
                         .allowedOrigins("*", "http://localhost:3000", "http://localhost:5173") // Origin
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // 메서드
-                        .allowedHeaders("*") // 헤더
-                        .allowCredentials(true); // 인증정보
+                        .allowedHeaders("*"); // 헤더
             }
         };
     }
