@@ -27,9 +27,9 @@ public class ExchangeService {
             "USD", "0000001",
             "JPY", "0000002",
             "EUR", "0000003",
-            "GBP", "0000004",
-            "AUD", "0000006",
-            "CNY", "0000007"
+            "GBP", "0000012",
+            "AUD", "0000017",
+            "CNY", "0000053"
     );
 
     public ExchangeService(RestTemplate restTemplate, ObjectMapper objectMapper) {
@@ -49,6 +49,8 @@ public class ExchangeService {
 
         String url = String.format("%s%s/json/kr/1/100/731Y001/D/%s/%s/%s",
                 BASE_URL, API_KEY, dateString, dateString, upperCurrencyCode);
+
+        log.info("##### Exchange rate sync url: {}", url);
 
         try {
             // RestTemplate을 사용한 동기적 API 호출
