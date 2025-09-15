@@ -50,8 +50,6 @@ public class ExchangeService {
         String url = String.format("%s%s/json/kr/1/100/731Y001/D/%s/%s/%s",
                 BASE_URL, API_KEY, dateString, dateString, upperCurrencyCode);
 
-        log.info("##### Exchange rate sync url: {}", url);
-
         try {
             // RestTemplate을 사용한 동기적 API 호출
             String jsonResponse = restTemplate.getForObject(url, String.class);
