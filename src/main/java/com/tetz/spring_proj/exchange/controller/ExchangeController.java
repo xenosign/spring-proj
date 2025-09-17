@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+import java.util.HashMap;
+
 @Tag(name = "환율 조회 API", description = "국가별 환율 조회 API")
 @RestController
 @RequiredArgsConstructor
@@ -18,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ExchangeController {
     private final ExchangeService exchangeService;
 
-    @Operation(summary = "단일 국가 환율 조회", description = "국가명(USD, JPY, EUR, GBP, AUD, CNY / 소문자 가능)을 사용하여 환율을 조회. 유효하지 않을 경우 400")
+    @Operation(summary = "단일 국가 환율 조회 (동기)", description = "국가명(USD, JPY, EUR, GBP, AUD, CNY / 소문자 가능)을 사용하여 환율을 조회. 유효하지 않을 경우 400")
     @GetMapping("/rate")
     public ResponseEntity<String> getExchangeRate(
             @Parameter(description = "조회할 국가명 (예: USD)", required = true)
@@ -28,6 +31,46 @@ public class ExchangeController {
             return ResponseEntity.ok(exchangeRate);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @Operation(summary = "전체 국가 환율 조회 (동기)",
+            description = "지원하는 모든 국가(USD, JPY, EUR, GBP, AUD, CNY)의 환율을 순서대로 동기적으로 조회")
+    @GetMapping("/rate/all/sync")
+    public ResponseEntity<Map<String, Object>> getAllExchangeRatesSync() {
+        long startTime = System.currentTimeMillis();
+
+        try {
+            Map<String, String> exchangeRates = exchangeService.getAllExchangeRatesSync();
+            long duration = System.currentTimeMillis() - startTime;
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("data", exchangeRates);
+            response.put("executionTimeMs", duration);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @Operation(summary = "전체 국가 환율 조회 (비동기)",
+            description = "지원하는 모든 국가(USD, JPY, EUR, GBP, AUD, CNY)의 환율을 병렬로 비동기적으로 조회")
+    @GetMapping("/rate/all/async")
+    public ResponseEntity<Map<String, Object>> getAllExchangeRatesAsync() {
+        long startTime = System.currentTimeMillis();
+
+        try {
+            Map<String, String> exchangeRates = exchangeService.getAllExchangeRatesAsync();
+
+            long duration = System.currentTimeMillis() - startTime;
+            Map<String, Object> response = new HashMap<>();
+            response.put("data", exchangeRates);
+            response.put("executionTimeMs", duration);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
         }
     }
 }
