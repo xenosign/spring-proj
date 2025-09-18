@@ -1,5 +1,6 @@
 package com.tetz.spring_proj.exchange.controller;
 
+import com.tetz.spring_proj.exchange.dto.ExchangeRateDTO;
 import com.tetz.spring_proj.exchange.service.ExchangeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -41,7 +42,7 @@ public class ExchangeController {
         long startTime = System.currentTimeMillis();
 
         try {
-            Map<String, String> exchangeRates = exchangeService.getAllExchangeRatesSync();
+            ExchangeRateDTO exchangeRates = exchangeService.getAllExchangeRatesSync();
             long duration = System.currentTimeMillis() - startTime;
 
             Map<String, Object> response = new HashMap<>();
@@ -61,7 +62,7 @@ public class ExchangeController {
         long startTime = System.currentTimeMillis();
 
         try {
-            Map<String, String> exchangeRates = exchangeService.getAllExchangeRatesAsync();
+            ExchangeRateDTO exchangeRates = exchangeService.getAllExchangeRatesAsync();
 
             long duration = System.currentTimeMillis() - startTime;
             Map<String, Object> response = new HashMap<>();
