@@ -38,18 +38,10 @@ public class ExchangeController {
     @Operation(summary = "전체 국가 환율 조회 (동기)",
             description = "지원하는 모든 국가(USD, JPY, EUR, GBP, AUD, CNY)의 환율을 순서대로 동기적으로 조회")
     @GetMapping("/rate/all/sync")
-    public ResponseEntity<Map<String, Object>> getAllExchangeRatesSync() {
-        long startTime = System.currentTimeMillis();
-
+    public ResponseEntity<ExchangeRateDTO> getAllExchangeRatesSync() {
         try {
             ExchangeRateDTO exchangeRates = exchangeService.getAllExchangeRatesSync();
-            long duration = System.currentTimeMillis() - startTime;
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("data", exchangeRates);
-            response.put("executionTimeMs", duration);
-
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(exchangeRates);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
@@ -58,18 +50,10 @@ public class ExchangeController {
     @Operation(summary = "전체 국가 환율 조회 (비동기)",
             description = "지원하는 모든 국가(USD, JPY, EUR, GBP, AUD, CNY)의 환율을 병렬로 비동기적으로 조회")
     @GetMapping("/rate/all/async")
-    public ResponseEntity<Map<String, Object>> getAllExchangeRatesAsync() {
-        long startTime = System.currentTimeMillis();
-
+    public ResponseEntity<ExchangeRateDTO> getAllExchangeRatesAsync() {
         try {
             ExchangeRateDTO exchangeRates = exchangeService.getAllExchangeRatesAsync();
-
-            long duration = System.currentTimeMillis() - startTime;
-            Map<String, Object> response = new HashMap<>();
-            response.put("data", exchangeRates);
-            response.put("executionTimeMs", duration);
-
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(exchangeRates);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }

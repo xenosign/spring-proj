@@ -5,28 +5,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
-import java.time.LocalDate;
-import java.util.List;
+import java.util.Map;
 
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class ExchangeRateDTO {
-    private String requestDate;
-    private boolean success;
-    private String message;
-    private List<CurrencyRate> rates;
-
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class CurrencyRate {
-        private String currencyCode;
-        private String currencyName;
-        private String exchangeRate;
-        private boolean isSuccess;
-        private String errorMessage;
-    }
+    private Map<String, String> data;
+    private long executionTimeMs;
 }
