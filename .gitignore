@@ -38,3 +38,4 @@ out/
 
 # Properties
 src/main/resources/temp.properties
+src/main/resources/application-prod.properties

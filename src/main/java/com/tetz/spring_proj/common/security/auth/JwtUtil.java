@@ -1,4 +1,4 @@
-package com.tetz.spring_proj.common.security;
+package com.tetz.spring_proj.common.security.auth;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
@@ -21,25 +21,37 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
-    public String generateToken(String username) {
+    public String generateToken(Long userId, String email) {
+        Claims claims = Jwts.claims().setSubject(userId.toString());
+        claims.put("email", email);
+
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpiration);
 
         return Jwts.builder()
-                .setSubject(username)
+                .setClaims(claims)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey())
                 .compact();
     }
 
-    public String getUsernameFromToken(String token) {
+    public String getUserIdFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
         return claims.getSubject();
+    }
+
+    public String getEmailFromToken(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.get("email", String.class);
     }
 
     public boolean validateToken(String token) {
@@ -52,5 +64,13 @@ public class JwtUtil {
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
+    }
+
+    public Claims getAllClaimsFromToken(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
     }
 }
