@@ -21,6 +21,9 @@ public class HomeController {
                 <a href="./swagger-ui/index.html" target="_blank">
                     <h1>🚀 스웨거 바로가기</h1>
                 </a>
+                <a href="./api/auth/kakao" target="_blank">
+                    <h1>🍋 카카오 로그인 임시 테스트</h1>
+                </a>
             </body>
             </html>
             """;
