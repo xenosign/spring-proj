@@ -24,36 +24,6 @@ public class TodoService {
     private final TodoRepository todoRepository;
     private final UserRepository userRepository; // 💡 UserRepository 주입
 
-    @PostConstruct
-    @Transactional
-    public void init() {
-        if (todoRepository.count() == 0) {
-            List<UserEntity> foundUsers = userRepository.findAll();
-
-            if (foundUsers.isEmpty()) {
-                log.info("더미 할일 데이터를 생성하기 위한 사용자가 존재하지 않습니다.");
-                return;
-            }
-
-            log.info("{}명의 사용자에 대한 더미 할일 데이터를 생성합니다.", foundUsers.size());
-
-            List<TodoEntity> dummyTodos = new ArrayList<>();
-
-            for (UserEntity user : foundUsers) {
-                for (int i = 1; i <= 3; i++) {
-                    String task = String.format("User %d의 할일 %d", user.getId(), i);
-                    TodoEntity todo = TodoEntity.builder()
-                            .task(task)
-                            .user(user)
-                            .build();
-                    dummyTodos.add(todo);
-                }
-            }
-
-            todoRepository.saveAll(dummyTodos);
-        }
-    }
-
     public List<TodoResponseDto> getAllTodosByUserId(String userId) {
         UserEntity user = findUserById(userId);
         return todoRepository.findAllTodosByUser(user)
