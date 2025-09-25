@@ -26,7 +26,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-
         String token = resolveToken(request);
 
         if (token != null && jwtUtil.validateToken(token)) {
@@ -56,9 +55,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 path.equals("/error");
     }
 
-    /**
-     * Authorization 헤더와 쿠키에서 JWT 토큰 추출
-     */
     private String resolveToken(HttpServletRequest request) {
         // 1. Authorization 헤더에서 토큰 추출 (우선순위)
         String bearerToken = request.getHeader("Authorization");
