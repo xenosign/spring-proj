@@ -25,7 +25,7 @@ public class TodoController {
     @Operation(summary = "TODO LIST 조회", description = "사용자의 모든 TODO LIST 조회")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "401", description = "로그인 필요")
+            @ApiResponse(responseCode = "403", description = "로그인 필요")
     })
     @GetMapping
     public ResponseEntity<List<TodoResponseDto>> getAllTodos(
@@ -37,7 +37,7 @@ public class TodoController {
     @Operation(summary = "미완료 TODO LIST 조회", description = "사용자의 미완료된 TODO LIST 조회")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "401", description = "로그인 필요")
+            @ApiResponse(responseCode = "403", description = "로그인 필요")
     })
     @GetMapping("/incomplete")
     public ResponseEntity<List<TodoResponseDto>> getIncompleteTodos(
@@ -50,7 +50,7 @@ public class TodoController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "생성 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청"),
-            @ApiResponse(responseCode = "401", description = "로그인 필요")
+            @ApiResponse(responseCode = "403", description = "로그인 필요")
     })
     @PostMapping
     public ResponseEntity<TodoResponseDto> createTodo(
@@ -64,7 +64,7 @@ public class TodoController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청"),
-            @ApiResponse(responseCode = "401", description = "로그인 필요"),
+            @ApiResponse(responseCode = "403", description = "로그인 필요"),
             @ApiResponse(responseCode = "404", description = "TODO를 찾을 수 없음")
     })
     @PutMapping("/{todoId}")
@@ -79,7 +79,7 @@ public class TodoController {
     @Operation(summary = "TODO 완료 처리", description = "TODO를 완료 상태로 변경")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "완료 처리 성공"),
-            @ApiResponse(responseCode = "401", description = "로그인 필요"),
+            @ApiResponse(responseCode = "403", description = "로그인 필요"),
             @ApiResponse(responseCode = "404", description = "TODO를 찾을 수 없음")
     })
     @PatchMapping("/{todoId}/complete")
@@ -93,7 +93,7 @@ public class TodoController {
     @Operation(summary = "TODO 미완료 처리", description = "TODO를 미완료 상태로 변경")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "미완료 처리 성공"),
-            @ApiResponse(responseCode = "401", description = "로그인 필요"),
+            @ApiResponse(responseCode = "403", description = "로그인 필요"),
             @ApiResponse(responseCode = "404", description = "TODO를 찾을 수 없음")
     })
     @PatchMapping("/{todoId}/incomplete")
@@ -107,7 +107,7 @@ public class TodoController {
     @Operation(summary = "TODO 삭제", description = "TODO 삭제")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "삭제 성공"),
-            @ApiResponse(responseCode = "401", description = "로그인 필요"),
+            @ApiResponse(responseCode = "403", description = "로그인 필요"),
             @ApiResponse(responseCode = "404", description = "TODO를 찾을 수 없음")
     })
     @DeleteMapping("/{todoId}")
