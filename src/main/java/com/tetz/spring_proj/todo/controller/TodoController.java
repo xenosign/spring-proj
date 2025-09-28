@@ -46,7 +46,7 @@ public class TodoController {
         return ResponseEntity.ok(todos);
     }
 
-    @Operation(summary = "TODO 생성", description = "새로운 TODO를 생성합니다.")
+    @Operation(summary = "TODO 생성", description = "새로운 TODO를 생성")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "생성 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청"),
@@ -60,7 +60,7 @@ public class TodoController {
         return ResponseEntity.ok(createdTodo);
     }
 
-    @Operation(summary = "TODO 수정", description = "기존 TODO의 내용을 수정합니다.")
+    @Operation(summary = "TODO 수정", description = "기존 TODO의 내용을 수정")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청"),
