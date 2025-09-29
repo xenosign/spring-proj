@@ -27,6 +27,9 @@ public class AuthController {
     @Value("${jwt.expiration}")
     private long jwtExpiration;
 
+    @Value("${kakao.front.redirect.url}")
+    private String kakaoFrontRedirectUrl;
+
     @GetMapping("/kakao")
     public RedirectView kakaoLogin() {
         String kakaoLoginUrl = authService.getKakaoLoginUrl();
