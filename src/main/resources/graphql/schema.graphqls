@@ -3,24 +3,24 @@ type Query {
     """
     모든 통화의 환율 정보를 조회합니다.
     """
-    ExchangeRateResponseDTO: ExchangeRateResponseDTO
+    ExchangeRateResponseDto: ExchangeRateResponseDto
 
     """
     특정 통화 코드 리스트를 받아 해당 환율 정보만 조회합니다.
     """
-    specificExchangeRates(currencyCodes: [String!]!): ExchangeRateResponseDTO
+    specificExchangeRates(currencyCodes: [String!]!): ExchangeRateResponseDto
 
     """
     모든 할 일 목록을 조회합니다.
     """
-    todos: [Todo]
+    getAllTodos: [TodoResponseDto]
 }
 
 # 환율(Exchange Rate) 관련 타입
 """
 환율 API의 전체 응답
 """
-type ExchangeRateResponseDTO {
+type ExchangeRateResponseDto {
     rates: [ExchangeRate]
     executionTimeMs: Int
 }
@@ -33,13 +33,11 @@ type ExchangeRate {
     rate: String!
 }
 
-
-
 # 할 일 목록
 """
 개별 할 일(Todo) 항목
 """
-type Todo {
+type TodoResponseDto {
     id: ID!
     task: String!
     completed: Boolean!

@@ -2,8 +2,8 @@ package com.tetz.spring_proj.exchange.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tetz.spring_proj.exchange.dto.ExchangeRateDTO;
-import com.tetz.spring_proj.exchange.dto.ExchangeRateResponseDTO;
+import com.tetz.spring_proj.exchange.dto.ExchangeRateDto;
+import com.tetz.spring_proj.exchange.dto.ExchangeRateResponseDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -78,11 +78,11 @@ public class ExchangeRateService {
     }
 
     // 특정 통화들의 환율 조회 (동기)
-    public ExchangeRateResponseDTO getSpecificExchangeRatesSync(List<String> currencyCodes) {
+    public ExchangeRateResponseDto getSpecificExchangeRatesSync(List<String> currencyCodes) {
         long startTime = System.currentTimeMillis();
         validateCurrencyCodes(currencyCodes);
 
-        List<ExchangeRateDTO> exchangeRateDTOS = new ArrayList<>();
+        List<ExchangeRateDto> exchangeRateDtos = new ArrayList<>();
         LocalDate requestDate = getBusinessDate(LocalDate.now());
         String dateString = requestDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
@@ -98,10 +98,10 @@ public class ExchangeRateService {
                 if (jsonResponse != null) {
                     String rate = extractDataValue(jsonResponse);
                     // [수정] ExchangeRate 객체를 생성하여 리스트에 추가
-                    ExchangeRateDTO er = new ExchangeRateDTO();
+                    ExchangeRateDto er = new ExchangeRateDto();
                     er.setCurrency(upperCurrencyCode);
                     er.setRate(rate);
-                    exchangeRateDTOS.add(er);
+                    exchangeRateDtos.add(er);
                     log.info("{}({}) 환율 조회 완료: {}", upperCurrencyCode, currencyId, rate);
                 }
             } catch (Exception e) {
@@ -111,14 +111,14 @@ public class ExchangeRateService {
 
         long executionTime = System.currentTimeMillis() - startTime;
 
-        return ExchangeRateResponseDTO.builder()
-                .rates(exchangeRateDTOS)
+        return ExchangeRateResponseDto.builder()
+                .rates(exchangeRateDtos)
                 .executionTimeMs(executionTime)
                 .build();
     }
 
     // 모든 환율 조회 (동기)
-    public ExchangeRateResponseDTO getAllExchangeRatesSync() {
+    public ExchangeRateResponseDto getAllExchangeRatesSync() {
         return getSpecificExchangeRatesSync(new ArrayList<>(CURRENCY_CODES.keySet()));
     }
 
@@ -126,7 +126,7 @@ public class ExchangeRateService {
     // ## 비동기 메서드
 
     // 특정 통화들의 환율 조회 (비동기)
-    public ExchangeRateResponseDTO getSpecificExchangeRatesAsync(List<String> currencyCodes) {
+    public ExchangeRateResponseDto getSpecificExchangeRatesAsync(List<String> currencyCodes) {
         long startTime = System.currentTimeMillis();
         validateCurrencyCodes(currencyCodes);
 
@@ -159,15 +159,15 @@ public class ExchangeRateService {
             futures.put(upperCurrencyCode, future);
         }
 
-        List<ExchangeRateDTO> exchangeRateDTOS = new ArrayList<>();
+        List<ExchangeRateDto> exchangeRateDtos = new ArrayList<>();
         for (Map.Entry<String, CompletableFuture<String>> entry : futures.entrySet()) {
             try {
                 String rate = entry.getValue().get();
                 if (rate != null) {
-                    ExchangeRateDTO er = new ExchangeRateDTO();
+                    ExchangeRateDto er = new ExchangeRateDto();
                     er.setCurrency(entry.getKey());
                     er.setRate(rate);
-                    exchangeRateDTOS.add(er);
+                    exchangeRateDtos.add(er);
                 }
             } catch (Exception e) {
                 log.error("{} 환율 결과 수집 실패: {}", entry.getKey(), e.getMessage());
@@ -176,14 +176,14 @@ public class ExchangeRateService {
 
         long executionTime = System.currentTimeMillis() - startTime;
 
-        return ExchangeRateResponseDTO.builder()
-                .rates(exchangeRateDTOS)
+        return ExchangeRateResponseDto.builder()
+                .rates(exchangeRateDtos)
                 .executionTimeMs(executionTime)
                 .build();
     }
 
     // 모든 환율을 비동기로 요청하는 메서드
-    public ExchangeRateResponseDTO getAllExchangeRatesAsync() {
+    public ExchangeRateResponseDto getAllExchangeRatesAsync() {
         return getSpecificExchangeRatesAsync(new ArrayList<>(CURRENCY_CODES.keySet()));
     }
 

@@ -11,7 +11,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ExchangeRateResponseDTO {
-    private List<ExchangeRateDTO> rates;
+public class ExchangeRateResponseDto {
+    private List<ExchangeRateDto> rates;
     private long executionTimeMs;
 }

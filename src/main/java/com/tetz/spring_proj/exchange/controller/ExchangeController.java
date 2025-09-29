@@ -1,6 +1,6 @@
 package com.tetz.spring_proj.exchange.controller;
 
-import com.tetz.spring_proj.exchange.dto.ExchangeRateResponseDTO;
+import com.tetz.spring_proj.exchange.dto.ExchangeRateResponseDto;
 import com.tetz.spring_proj.exchange.service.ExchangeRateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -37,9 +37,9 @@ public class ExchangeController {
     @Operation(summary = "전체 국가 환율 조회 (동기)",
             description = "지원하는 모든 국가(USD, JPY, EUR, GBP, AUD, CNY)의 환율을 순서대로 동기적으로 조회")
     @GetMapping("/rate/all/sync")
-    public ResponseEntity<ExchangeRateResponseDTO> getAllExchangeRatesSync() {
+    public ResponseEntity<ExchangeRateResponseDto> getAllExchangeRatesSync() {
         try {
-            ExchangeRateResponseDTO exchangeRates = exchangeRateService.getAllExchangeRatesSync();
+            ExchangeRateResponseDto exchangeRates = exchangeRateService.getAllExchangeRatesSync();
             return ResponseEntity.ok(exchangeRates);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
@@ -49,9 +49,9 @@ public class ExchangeController {
     @Operation(summary = "전체 국가 환율 조회 (비동기)",
             description = "지원하는 모든 국가(USD, JPY, EUR, GBP, AUD, CNY)의 환율을 병렬로 비동기적으로 조회")
     @GetMapping("/rate/all/async")
-    public ResponseEntity<ExchangeRateResponseDTO> getAllExchangeRatesAsync() {
+    public ResponseEntity<ExchangeRateResponseDto> getAllExchangeRatesAsync() {
         try {
-            ExchangeRateResponseDTO exchangeRates = exchangeRateService.getAllExchangeRatesAsync();
+            ExchangeRateResponseDto exchangeRates = exchangeRateService.getAllExchangeRatesAsync();
             return ResponseEntity.ok(exchangeRates);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
@@ -74,7 +74,7 @@ public class ExchangeController {
                     .map(String::toUpperCase)
                     .toList();
 
-            ExchangeRateResponseDTO result = exchangeRateService.getSpecificExchangeRatesSync(currencyList);
+            ExchangeRateResponseDto result = exchangeRateService.getSpecificExchangeRatesSync(currencyList);
             return ResponseEntity.ok(result);
 
         } catch (IllegalArgumentException e) {
@@ -100,7 +100,7 @@ public class ExchangeController {
                     .map(String::toUpperCase)
                     .toList();
 
-            ExchangeRateResponseDTO result = exchangeRateService.getSpecificExchangeRatesAsync(currencyList);
+            ExchangeRateResponseDto result = exchangeRateService.getSpecificExchangeRatesAsync(currencyList);
             return ResponseEntity.ok(result);
 
         } catch (IllegalArgumentException e) {
