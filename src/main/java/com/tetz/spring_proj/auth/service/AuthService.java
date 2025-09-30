@@ -23,7 +23,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Transactional
 @Slf4j
 public class AuthService {
-
     private final UserService userService;
     private final JwtUtil jwtUtil;
     private final RestTemplate restTemplate = new RestTemplate();
@@ -48,13 +47,21 @@ public class AuthService {
     private long jwtExpiration;
 
     public String getKakaoLoginUrl() {
-        return UriComponentsBuilder.fromHttpUrl(kakaoAuthUri)
+        return getKakaoLoginUrl(null);
+    }
+
+    public String getKakaoLoginUrl(String state) {
+         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(kakaoAuthUri)
                 .queryParam("client_id", kakaoClientId)
                 .queryParam("redirect_uri", kakaoRedirectUri)
                 .queryParam("response_type", "code")
-                .queryParam("scope", "profile_nickname,profile_image,account_email")
-                .build()
-                .toUriString();
+                .queryParam("scope", "profile_nickname,profile_image,account_email");
+
+        if (state != null && !state.trim().isEmpty()) {
+            builder.queryParam("state", state);
+        }
+
+        return builder.build().toUriString();
     }
 
     public AuthResponse processKakaoCallback(String authorizationCode) {

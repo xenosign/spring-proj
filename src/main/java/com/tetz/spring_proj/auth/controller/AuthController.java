@@ -36,9 +36,18 @@ public class AuthController {
         return new RedirectView(kakaoLoginUrl);
     }
 
+    // JWT 토큰 백엔드 확인용 엔드 포인트
+    @GetMapping("/kakao/backend")
+    public RedirectView kakaoLoginForBackend() {
+        String kakaoLoginUrl = authService.getKakaoLoginUrl("backend");
+        return new RedirectView(kakaoLoginUrl);
+    }
+
     @GetMapping("/kakao/callback")
-    public ResponseEntity<AuthResponse> kakaoCallback(@RequestParam String code,
-                                                      HttpServletResponse response) {
+    public Object kakaoCallback(@RequestParam String code,
+                                @RequestParam(required = false) String state,
+                                HttpServletResponse response) {
+
         try {
             AuthResponse authResponse = authService.processKakaoCallback(code);
 
@@ -47,15 +56,25 @@ public class AuthController {
             jwtCookie.setSecure(kakaoCookieSecure);
             jwtCookie.setPath("/");
             jwtCookie.setMaxAge((int) (jwtExpiration / 1000));
-
             response.addCookie(jwtCookie);
 
-            return ResponseEntity.ok(authResponse);
+            if ("backend".equals(state)) {
+                return ResponseEntity.ok(authResponse);
+            } else {
+                return new RedirectView(kakaoFrontRedirectUrl);
+            }
+
         } catch (Exception e) {
             log.error("카카오 OAuth 콜백 처리 오류", e);
-            return ResponseEntity.badRequest().build();
+
+            if ("backend".equals(state)) {
+                return ResponseEntity.badRequest().build();
+            } else {
+                return new RedirectView(kakaoFrontRedirectUrl + "?error=auth_failed");
+            }
         }
     }
+
 
     @GetMapping("/kakao/url")
     public ResponseEntity<Map<String, String>> getKakaoLoginUrl() {
