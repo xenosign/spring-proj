@@ -1,8 +1,7 @@
 package com.tetz.spring_proj.common.security;
 
 import com.tetz.spring_proj.auth.filter.JwtAuthenticationFilter;
-import com.tetz.spring_proj.common.security.auth.JwtUtil; // JwtUtil이 필요하다면 import
-import lombok.RequiredArgsConstructor; // 생성자 주입을 위해 Lombok의 RequiredArgsConstructor 사용
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
