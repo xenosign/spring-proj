@@ -52,7 +52,7 @@ public class AuthController {
             AuthResponse authResponse = authService.processKakaoCallback(code);
 
             Cookie jwtCookie = new Cookie("jwt", authResponse.getAccessToken());
-            jwtCookie.setHttpOnly(true); // XSS 공격 방지
+            jwtCookie.setHttpOnly(true);
             jwtCookie.setSecure(kakaoCookieSecure);
             jwtCookie.setPath("/");
             jwtCookie.setMaxAge((int) (jwtExpiration / 1000));
