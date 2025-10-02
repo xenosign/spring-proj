@@ -61,7 +61,10 @@ public class AuthController {
             if ("backend".equals(state)) {
                 return ResponseEntity.ok(authResponse);
             } else {
-                return new RedirectView(kakaoFrontRedirectUrl);
+                // 프론트 배포 되면 수정 필요
+                String redirectUrl = kakaoFrontRedirectUrl +
+                        "?token=" + authResponse.getAccessToken();
+                return new RedirectView(redirectUrl);
             }
 
         } catch (Exception e) {
