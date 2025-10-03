@@ -17,6 +17,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -29,6 +30,7 @@ public class ExchangeRateService {
     private final ObjectMapper objectMapper;
     private final ExecutorService executorService;
 
+    // 한국은행 ECOS API의 통계항목 코드는 고정
     private static final Map<String, String> CURRENCY_CODES = Map.of(
             "USD", "0000001",
             "JPY", "0000002",
@@ -41,71 +43,57 @@ public class ExchangeRateService {
     public ExchangeRateService(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
+        // API 호출을 위한 스레드 풀 설정
         this.executorService = Executors.newFixedThreadPool(10);
     }
 
-    // ## 동기 메서드
+    // ## 동기 메서드 (수정: 재시도 로직 적용)
 
-    // 단일 환율 조회
+    // 단일 환율 조회 (내부 재시도 로직 사용)
     public String getExchangeRateSync(String currencyCode) {
-        String upperCurrencyCode = CURRENCY_CODES.get(currencyCode.toUpperCase());
-        if (upperCurrencyCode == null) {
+        String upperCurrencyCode = currencyCode.toUpperCase();
+        String currencyId = CURRENCY_CODES.get(upperCurrencyCode);
+
+        if (currencyId == null) {
             throw new IllegalArgumentException("Unsupported currency code: " + currencyCode);
         }
 
-        // 주말인 경우 같은 주 금요일로 조정
-        LocalDate requestDate = getBusinessDate(LocalDate.now());
-        String dateString = requestDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-
-        String url = String.format("%s%s/json/kr/1/100/731Y001/D/%s/%s/%s",
-                BASE_URL, API_KEY, dateString, dateString, upperCurrencyCode);
-
         try {
-            // RestTemplate을 사용한 동기적 API 호출
-            String jsonResponse = restTemplate.getForObject(url, String.class);
-
-            if (jsonResponse == null) {
-                throw new RuntimeException("API 응답이 null입니다.");
+            // 최대 5일 전까지 거슬러 올라가며 환율 데이터를 조회합니다.
+            String rate = fetchRateWithRetry(currencyId, LocalDate.now(), 5);
+            if (rate == null) {
+                throw new RuntimeException(upperCurrencyCode + " 환율 데이터를 찾을 수 없습니다.");
             }
-
-            // JSON에서 DATA_VALUE 추출
-            return extractDataValue(jsonResponse);
-
+            return rate;
         } catch (Exception e) {
-            log.error("환율 조회 중 오류 발생: {}", e.getMessage(), e);
+            log.error("단일 환율 조회 실패: {}", e.getMessage());
             throw new RuntimeException("환율 조회 실패", e);
         }
     }
 
-    // 특정 통화들의 환율 조회 (동기)
+    // 특정 통화들의 환율 조회 (동기, 재시도 로직 적용)
     public ExchangeRateResponseDto getSpecificExchangeRatesSync(List<String> currencyCodes) {
         long startTime = System.currentTimeMillis();
         validateCurrencyCodes(currencyCodes);
 
         List<ExchangeRateDto> exchangeRateDtos = new ArrayList<>();
-        LocalDate requestDate = getBusinessDate(LocalDate.now());
-        String dateString = requestDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
         for (String currencyCode : currencyCodes) {
             String upperCurrencyCode = currencyCode.toUpperCase();
             String currencyId = CURRENCY_CODES.get(upperCurrencyCode);
 
             try {
-                String url = String.format("%s%s/json/kr/1/100/731Y001/D/%s/%s/%s",
-                        BASE_URL, API_KEY, dateString, dateString, currencyId);
+                // 재시도 로직이 적용된 메서드 호출
+                String rate = fetchRateWithRetry(currencyId, LocalDate.now(), 5);
 
-                String jsonResponse = restTemplate.getForObject(url, String.class);
-                if (jsonResponse != null) {
-                    String rate = extractDataValue(jsonResponse);
-                    // [수정] ExchangeRate 객체를 생성하여 리스트에 추가
+                if (rate != null) {
                     ExchangeRateDto er = new ExchangeRateDto();
                     er.setCurrency(upperCurrencyCode);
                     er.setRate(rate);
                     exchangeRateDtos.add(er);
-                    log.info("{}({}) 환율 조회 완료: {}", upperCurrencyCode, currencyId, rate);
                 }
             } catch (Exception e) {
-                log.error("{} 환율 조회 실패: {}", upperCurrencyCode, e.getMessage());
+                log.error("{} 환율 조회 실패 (최종): {}", upperCurrencyCode, e.getMessage());
             }
         }
 
@@ -122,57 +110,53 @@ public class ExchangeRateService {
         return getSpecificExchangeRatesSync(new ArrayList<>(CURRENCY_CODES.keySet()));
     }
 
+    // ## 비동기 메서드 (수정: 재시도 로직 적용)
 
-    // ## 비동기 메서드
-
-    // 특정 통화들의 환율 조회 (비동기)
+    // 특정 통화들의 환율 조회 (비동기, 재시도 로직 적용)
     public ExchangeRateResponseDto getSpecificExchangeRatesAsync(List<String> currencyCodes) {
         long startTime = System.currentTimeMillis();
         validateCurrencyCodes(currencyCodes);
 
-        Map<String, CompletableFuture<String>> futures = new HashMap<>();
-        LocalDate requestDate = getBusinessDate(LocalDate.now());
-        String dateString = requestDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        List<CompletableFuture<ExchangeRateDto>> futures = new ArrayList<>();
 
         for (String currencyCode : currencyCodes) {
             String upperCurrencyCode = currencyCode.toUpperCase();
             String currencyId = CURRENCY_CODES.get(upperCurrencyCode);
 
-            CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            // CompletableFuture를 사용하여 비동기적으로 API 호출
+            CompletableFuture<ExchangeRateDto> future = CompletableFuture.supplyAsync(() -> {
                 try {
-                    String url = String.format("%s%s/json/kr/1/100/731Y001/D/%s/%s/%s",
-                            BASE_URL, API_KEY, dateString, dateString, currencyId);
+                    // 재시도 로직이 적용된 메서드 호출
+                    String rate = fetchRateWithRetry(currencyId, LocalDate.now(), 5);
 
-                    String jsonResponse = restTemplate.getForObject(url, String.class);
-                    if (jsonResponse != null) {
-                        String exchangeRate = extractDataValue(jsonResponse);
-                        log.info("{}({}) 환율 조회 완료: {}", upperCurrencyCode, currencyId, exchangeRate);
-                        return exchangeRate;
+                    if (rate != null) {
+                        ExchangeRateDto er = new ExchangeRateDto();
+                        er.setCurrency(upperCurrencyCode);
+                        er.setRate(rate);
+                        return er;
                     }
-                    return null;
                 } catch (Exception e) {
-                    log.error("{} 환율 조회 실패: {}", upperCurrencyCode, e.getMessage());
-                    return null;
+                    log.error("{} 환율 조회 실패 (비동기): {}", upperCurrencyCode, e.getMessage());
                 }
+                return null; // 실패 시 null 반환
             }, executorService);
 
-            futures.put(upperCurrencyCode, future);
+            futures.add(future);
         }
 
-        List<ExchangeRateDto> exchangeRateDtos = new ArrayList<>();
-        for (Map.Entry<String, CompletableFuture<String>> entry : futures.entrySet()) {
-            try {
-                String rate = entry.getValue().get();
-                if (rate != null) {
-                    ExchangeRateDto er = new ExchangeRateDto();
-                    er.setCurrency(entry.getKey());
-                    er.setRate(rate);
-                    exchangeRateDtos.add(er);
-                }
-            } catch (Exception e) {
-                log.error("{} 환율 결과 수집 실패: {}", entry.getKey(), e.getMessage());
-            }
-        }
+        // 모든 비동기 작업의 완료를 기다립니다.
+        List<ExchangeRateDto> exchangeRateDtos = futures.stream()
+                .map(future -> {
+                    try {
+                        // 5초 타임아웃 설정
+                        return future.get(5, TimeUnit.SECONDS);
+                    } catch (Exception e) {
+                        log.error("비동기 결과 수집 중 타임아웃 또는 예외 발생", e);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toList());
 
         long executionTime = System.currentTimeMillis() - startTime;
 
@@ -187,9 +171,37 @@ public class ExchangeRateService {
         return getSpecificExchangeRatesAsync(new ArrayList<>(CURRENCY_CODES.keySet()));
     }
 
-    // ## 공통 메서드 영역
 
-    // 통화 코드 검증
+    // ## 공통 및 핵심 로직
+    private String fetchRateWithRetry(String currencyId, LocalDate startDate, int maxRetries) {
+        LocalDate currentDate = startDate;
+
+        for (int i = 0; i < maxRetries; i++) {
+            LocalDate requestDate = getRequestDate(currentDate);
+            String dateString = requestDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+            String url = String.format("%s%s/json/kr/1/100/731Y001/D/%s/%s/%s",
+                    BASE_URL, API_KEY, dateString, dateString, currencyId);
+
+            try {
+                String jsonResponse = restTemplate.getForObject(url, String.class);
+
+                if (jsonResponse != null && jsonResponse.contains("\"CODE\":\"INFO-200\"")) {
+                    log.warn("ECOS API: {}에 데이터 없음. 이전 날짜({})로 재시도.", dateString, requestDate.minusDays(1));
+                    currentDate = currentDate.minusDays(1); // 날짜 하루 전으로 이동
+                    continue;
+                }
+
+                return extractDataValue(jsonResponse);
+
+            } catch (Exception e) {
+                log.error("API 요청 실패 (날짜: {}): {}", dateString, e.getMessage());
+                break;
+            }
+        }
+        return null;
+    }
+
     private void validateCurrencyCodes(List<String> currencyCodes) {
         if (currencyCodes == null || currencyCodes.isEmpty()) {
             throw new IllegalArgumentException("통화 코드 리스트가 비어있습니다.");
@@ -210,7 +222,6 @@ public class ExchangeRateService {
         }
     }
 
-    // ECOS 응답 JSON 에서 환율 추출 메서드
     private String extractDataValue(String jsonResponse) {
         try {
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
@@ -231,23 +242,33 @@ public class ExchangeRateService {
         }
     }
 
-    // 주말에는 환율 업데이트가 안되므로 토 ~ 월요일 오전 9시 이전 까지는 금요일로 날짜를 변경하는 메서드
-    private LocalDate getBusinessDate(LocalDate date) {
+    private LocalDate getRequestDate(LocalDate date) {
         DayOfWeek dayOfWeek = date.getDayOfWeek();
         LocalTime currentTime = LocalTime.now();
 
-        if (dayOfWeek == DayOfWeek.SATURDAY) {
-            // 토요일인 케이스
-            return date.minusDays(1);
-        } else if (dayOfWeek == DayOfWeek.SUNDAY) {
-            // 일요일인 케이스
-            return date.minusDays(2);
-        } else if (dayOfWeek == DayOfWeek.MONDAY && currentTime.isBefore(LocalTime.of(9, 0))) {
-            // 월요일 오전 9시 이전인 케이스
+        if (dayOfWeek == DayOfWeek.MONDAY && currentTime.isBefore(LocalTime.of(9, 0))) {
             return date.minusDays(3);
         }
 
-        // 월요일 9시 이후 평일
+        else if (dayOfWeek.getValue() >= DayOfWeek.TUESDAY.getValue()
+                && dayOfWeek.getValue() <= DayOfWeek.FRIDAY.getValue()
+                && currentTime.isBefore(LocalTime.of(9, 0))) {
+            return date.minusDays(1);
+        }
+
         return date;
+    }
+
+    @jakarta.annotation.PreDestroy
+    public void shutdown() {
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException ex) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 }
