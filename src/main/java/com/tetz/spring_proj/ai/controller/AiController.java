@@ -2,6 +2,7 @@ package com.tetz.spring_proj.ai.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -10,4 +11,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Slf4j
 public class AiController {
+    @GetMapping
+    public String hello() {
+        return "Hello My City";
+    }
 }
