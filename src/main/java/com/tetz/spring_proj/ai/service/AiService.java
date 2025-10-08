@@ -1,9 +1,253 @@
 package com.tetz.spring_proj.ai.service;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AiService {
+    private final WebClient webClient;
+    private final ObjectMapper objectMapper;
+    private final ExecutorService executor = Executors.newCachedThreadPool();
+
+    public enum AiProvider {
+        GPT, GEMINI, CLAUDE
+    }
+
+    public SseEmitter streamAiResponse(String userMessage, String apiKey, AiProvider provider) {
+        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
+
+        executor.execute(() -> {
+            try {
+                switch (provider) {
+                    case GPT -> streamGptResponse(emitter, userMessage, apiKey);
+                    case GEMINI -> streamGeminiResponse(emitter, userMessage, apiKey);
+                    case CLAUDE -> streamClaudeResponse(emitter, userMessage, apiKey);
+                }
+            } catch (Exception e) {
+                log.error("AI 스트리밍 중 오류 발생: {}", provider, e);
+                emitter.completeWithError(e);
+            }
+        });
+
+        return emitter;
+    }
+
+    // ========== GPT ==========
+    private void streamGptResponse(SseEmitter emitter, String userMessage, String apiKey) {
+        Map<String, Object> requestBody = createGptRequestBody(userMessage);
+
+        webClient.post()
+                .uri("https://api.openai.com/v1/chat/completions")
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Content-Type", "application/json")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .subscribe(
+                        chunk -> handleGptChunk(emitter, chunk),
+                        error -> handleError(emitter, error),
+                        () -> handleComplete(emitter)
+                );
+    }
+
+    private Map<String, Object> createGptRequestBody(String userMessage) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "gpt-3.5-turbo");
+        requestBody.put("stream", true);
+
+        Map<String, String> message = new HashMap<>();
+        message.put("role", "user");
+        message.put("content", userMessage);
+
+        requestBody.put("messages", List.of(message));
+        requestBody.put("max_tokens", 1000);
+        requestBody.put("temperature", 0.7);
+
+        return requestBody;
+    }
+
+    private void handleGptChunk(SseEmitter emitter, String chunk) {
+        try {
+            if (chunk.startsWith("data: ")) {
+                String jsonData = chunk.substring(6).trim();
+
+                if ("[DONE]".equals(jsonData)) return;
+
+                JsonNode rootNode = objectMapper.readTree(jsonData);
+                JsonNode choices = rootNode.path("choices");
+
+                if (choices.isArray() && choices.size() > 0) {
+                    JsonNode delta = choices.get(0).path("delta");
+                    String content = delta.path("content").asText("");
+
+                    if (!content.isEmpty()) {
+                        emitter.send(SseEmitter.event()
+                                .name("message")
+                                .data(content));
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.error("GPT 청크 처리 중 오류", e);
+            emitter.completeWithError(e);
+        }
+    }
+
+    // ========== GEMINI ==========
+    private void streamGeminiResponse(SseEmitter emitter, String userMessage, String apiKey) {
+        Map<String, Object> requestBody = createGeminiRequestBody(userMessage);
+
+        webClient.post()
+                .uri("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=" + apiKey)
+                .header("Content-Type", "application/json")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .subscribe(
+                        chunk -> handleGeminiChunk(emitter, chunk),
+                        error -> handleError(emitter, error),
+                        () -> handleComplete(emitter)
+                );
+    }
+
+    private Map<String, Object> createGeminiRequestBody(String userMessage) {
+        Map<String, Object> requestBody = new HashMap<>();
+
+        Map<String, String> part = new HashMap<>();
+        part.put("text", userMessage);
+
+        Map<String, Object> content = new HashMap<>();
+        content.put("parts", List.of(part));
+
+        requestBody.put("contents", List.of(content));
+
+        return requestBody;
+    }
+
+    private void handleGeminiChunk(SseEmitter emitter, String chunk) {
+        try {
+            if (chunk.trim().isEmpty()) return;
+
+            JsonNode rootNode = objectMapper.readTree(chunk);
+            JsonNode candidates = rootNode.path("candidates");
+
+            if (candidates.isArray() && candidates.size() > 0) {
+                JsonNode content = candidates.get(0).path("content");
+                JsonNode parts = content.path("parts");
+
+                if (parts.isArray() && parts.size() > 0) {
+                    String text = parts.get(0).path("text").asText("");
+
+                    if (!text.isEmpty()) {
+                        emitter.send(SseEmitter.event()
+                                .name("message")
+                                .data(text));
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.error("Gemini 청크 처리 중 오류", e);
+            emitter.completeWithError(e);
+        }
+    }
+
+    // ========== CLAUDE ==========
+    private void streamClaudeResponse(SseEmitter emitter, String userMessage, String apiKey) {
+        Map<String, Object> requestBody = createClaudeRequestBody(userMessage);
+
+        webClient.post()
+                .uri("https://api.anthropic.com/v1/messages")
+                .header("x-api-key", apiKey)
+                .header("anthropic-version", "2023-06-01")
+                .header("Content-Type", "application/json")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .subscribe(
+                        chunk -> handleClaudeChunk(emitter, chunk),
+                        error -> handleError(emitter, error),
+                        () -> handleComplete(emitter)
+                );
+    }
+
+    private Map<String, Object> createClaudeRequestBody(String userMessage) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "claude-3-sonnet-20240229");
+        requestBody.put("max_tokens", 1024);
+        requestBody.put("stream", true);
+
+        Map<String, String> message = new HashMap<>();
+        message.put("role", "user");
+        message.put("content", userMessage);
+
+        requestBody.put("messages", List.of(message));
+
+        return requestBody;
+    }
+
+    private void handleClaudeChunk(SseEmitter emitter, String chunk) {
+        try {
+            if (chunk.startsWith("data: ")) {
+                String jsonData = chunk.substring(6).trim();
+
+                if ("[DONE]".equals(jsonData)) return;
+
+                JsonNode rootNode = objectMapper.readTree(jsonData);
+                String type = rootNode.path("type").asText("");
+
+                if ("content_block_delta".equals(type)) {
+                    JsonNode delta = rootNode.path("delta");
+                    String text = delta.path("text").asText("");
+
+                    if (!text.isEmpty()) {
+                        emitter.send(SseEmitter.event()
+                                .name("message")
+                                .data(text));
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.error("Claude 청크 처리 중 오류", e);
+            emitter.completeWithError(e);
+        }
+    }
+
+    // ========== 공통 처리 ==========
+    private void handleError(SseEmitter emitter, Throwable error) {
+        log.error("AI API 호출 중 오류 발생", error);
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("error")
+                    .data("오류 발생: " + error.getMessage()));
+        } catch (IOException e) {
+            log.error("에러 전송 실패", e);
+        }
+        emitter.completeWithError(error);
+    }
+
+    private void handleComplete(SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("done")
+                    .data("완료"));
+            emitter.complete();
+        } catch (IOException e) {
+            log.error("완료 이벤트 전송 실패", e);
+            emitter.completeWithError(e);
+        }
+    }
 }
