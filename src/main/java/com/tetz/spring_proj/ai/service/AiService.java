@@ -1,5 +1,6 @@
 package com.tetz.spring_proj.ai.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -23,19 +24,28 @@ public class AiService {
     private final ObjectMapper objectMapper;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
+    @Value("${ai.openai.api-key}")
+    private String openaiApiKey;
+
+    @Value("${ai.gemini.api-key}")
+    private String geminiApiKey;
+
+    @Value("${ai.claude.api-key}")
+    private String claudeApiKey;
+
     public enum AiProvider {
         GPT, GEMINI, CLAUDE
     }
 
-    public SseEmitter streamAiResponse(String userMessage, String apiKey, AiProvider provider) {
+    public SseEmitter streamAiResponse(String userMessage, AiProvider provider) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 
         executor.execute(() -> {
             try {
                 switch (provider) {
-                    case GPT -> streamGptResponse(emitter, userMessage, apiKey);
-                    case GEMINI -> streamGeminiResponse(emitter, userMessage, apiKey);
-                    case CLAUDE -> streamClaudeResponse(emitter, userMessage, apiKey);
+                    case GPT -> streamGptResponse(emitter, userMessage);
+                    case GEMINI -> streamGeminiResponse(emitter, userMessage);
+                    case CLAUDE -> streamClaudeResponse(emitter, userMessage);
                 }
             } catch (Exception e) {
                 log.error("AI 스트리밍 중 오류 발생: {}", provider, e);
@@ -47,12 +57,12 @@ public class AiService {
     }
 
     // ========== GPT ==========
-    private void streamGptResponse(SseEmitter emitter, String userMessage, String apiKey) {
+    private void streamGptResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createGptRequestBody(userMessage);
 
         webClient.post()
                 .uri("https://api.openai.com/v1/chat/completions")
-                .header("Authorization", "Bearer " + apiKey)
+                .header("Authorization", "Bearer " + openaiApiKey)
                 .header("Content-Type", "application/json")
                 .bodyValue(requestBody)
                 .retrieve()
@@ -108,11 +118,11 @@ public class AiService {
     }
 
     // ========== GEMINI ==========
-    private void streamGeminiResponse(SseEmitter emitter, String userMessage, String apiKey) {
+    private void streamGeminiResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createGeminiRequestBody(userMessage);
 
         webClient.post()
-                .uri("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=" + apiKey)
+                .uri("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=" + geminiApiKey)
                 .header("Content-Type", "application/json")
                 .bodyValue(requestBody)
                 .retrieve()
@@ -166,12 +176,12 @@ public class AiService {
     }
 
     // ========== CLAUDE ==========
-    private void streamClaudeResponse(SseEmitter emitter, String userMessage, String apiKey) {
+    private void streamClaudeResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createClaudeRequestBody(userMessage);
 
         webClient.post()
                 .uri("https://api.anthropic.com/v1/messages")
-                .header("x-api-key", apiKey)
+                .header("x-api-key", claudeApiKey)
                 .header("anthropic-version", "2023-06-01")
                 .header("Content-Type", "application/json")
                 .bodyValue(requestBody)
