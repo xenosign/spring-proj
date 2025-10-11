@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -22,6 +24,8 @@ import java.util.concurrent.Executors;
 public class AiService {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
+    // @PostConstruct 대신 생성자에서 직접 초기화 또는 @Bean으로 관리하는 것이 좋습니다.
+    // 여기서는 @PreDestroy를 위해 클래스 멤버로 유지합니다.
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     @Value("${ai.openai.api-key}")
@@ -38,8 +42,10 @@ public class AiService {
     }
 
     public SseEmitter streamAiResponse(String userMessage, AiProvider provider) {
+        // SSE 연결이 닫히지 않도록 충분히 긴 타임아웃 설정
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 
+        // 비동기 처리를 위해 ExecutorService 사용
         executor.execute(() -> {
             try {
                 switch (provider) {
@@ -56,7 +62,7 @@ public class AiService {
         return emitter;
     }
 
-    // ========== GPT ==========
+    // ========== GPT (SSE) ==========
     private void streamGptResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createGptRequestBody(userMessage);
 
@@ -117,16 +123,20 @@ public class AiService {
         }
     }
 
-    // ========== GEMINI ==========
+    // ========== GEMINI (JSON 배열 형식 스트림) ==========
     private void streamGeminiResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createGeminiRequestBody(userMessage);
 
         webClient.post()
                 .uri("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=" + geminiApiKey)
                 .header("Content-Type", "application/json")
+                // Gemini API는 스트림 응답이 JSON 배열 형태이므로,
+                // String으로 전체를 받은 후 \n 기준으로 분리하는 커스텀 처리가 필요합니다.
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToFlux(String.class)
+                .flatMap(chunk -> Flux.fromStream(Stream.of(chunk.split("\n")))) // 💡핵심: 줄바꿈 기준으로 분리
+                .filter(s -> !s.trim().isEmpty())
                 .subscribe(
                         chunk -> handleGeminiChunk(emitter, chunk),
                         error -> handleError(emitter, error),
@@ -150,8 +160,7 @@ public class AiService {
 
     private void handleGeminiChunk(SseEmitter emitter, String chunk) {
         try {
-            if (chunk.trim().isEmpty()) return;
-
+            // chunk는 이제 줄바꿈으로 분리된, 하나의 완전한 JSON 객체입니다.
             JsonNode rootNode = objectMapper.readTree(chunk);
             JsonNode candidates = rootNode.path("candidates");
 
@@ -175,7 +184,7 @@ public class AiService {
         }
     }
 
-    // ========== CLAUDE ==========
+    // ========== CLAUDE (SSE) ==========
     private void streamClaudeResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createClaudeRequestBody(userMessage);
 
@@ -245,6 +254,7 @@ public class AiService {
                     .data("오류 발생: " + error.getMessage()));
         } catch (IOException e) {
             log.error("에러 전송 실패", e);
+            emitter.completeWithError(e); // 💡 개선: 에러 전송 실패 시 최종 처리
         }
         emitter.completeWithError(error);
     }
@@ -257,7 +267,12 @@ public class AiService {
             emitter.complete();
         } catch (IOException e) {
             log.error("완료 이벤트 전송 실패", e);
-            emitter.completeWithError(e);
+            emitter.completeWithError(e); // 💡 개선: 완료 이벤트 전송 실패 시 최종 처리
         }
+    }
+
+    @jakarta.annotation.PreDestroy
+    public void shutdownExecutor() {
+        executor.shutdown();
     }
 }
