@@ -24,8 +24,6 @@ import java.util.stream.Stream;
 public class AiService {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
-    // @PostConstruct 대신 생성자에서 직접 초기화 또는 @Bean으로 관리하는 것이 좋습니다.
-    // 여기서는 @PreDestroy를 위해 클래스 멤버로 유지합니다.
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     @Value("${ai.openai.api-key}")
@@ -42,10 +40,8 @@ public class AiService {
     }
 
     public SseEmitter streamAiResponse(String userMessage, AiProvider provider) {
-        // SSE 연결이 닫히지 않도록 충분히 긴 타임아웃 설정
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 
-        // 비동기 처리를 위해 ExecutorService 사용
         executor.execute(() -> {
             try {
                 switch (provider) {
@@ -130,8 +126,6 @@ public class AiService {
         webClient.post()
                 .uri("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=" + geminiApiKey)
                 .header("Content-Type", "application/json")
-                // Gemini API는 스트림 응답이 JSON 배열 형태이므로,
-                // String으로 전체를 받은 후 \n 기준으로 분리하는 커스텀 처리가 필요합니다.
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToFlux(String.class)
@@ -160,7 +154,6 @@ public class AiService {
 
     private void handleGeminiChunk(SseEmitter emitter, String chunk) {
         try {
-            // chunk는 이제 줄바꿈으로 분리된, 하나의 완전한 JSON 객체입니다.
             JsonNode rootNode = objectMapper.readTree(chunk);
             JsonNode candidates = rootNode.path("candidates");
 
