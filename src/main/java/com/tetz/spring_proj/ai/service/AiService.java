@@ -119,7 +119,6 @@ public class AiService {
                         String content = delta.path("content").asText("");
 
                         if (!content.isEmpty()) {
-                            log.info("전송: [{}]", content);
                             emitter.send(SseEmitter.event()
                                     .name("message")
                                     .data(content));
@@ -204,7 +203,6 @@ public class AiService {
                             String text = parts.get(0).path("text").asText("");
 
                             if (!text.isEmpty()) {
-                                log.info("Gemini 전송: [{}]", text);
                                 emitter.send(SseEmitter.event()
                                         .name("message")
                                         .data(text));
@@ -276,7 +274,6 @@ public class AiService {
                         String text = delta.path("text").asText("");
 
                         if (!text.isEmpty()) {
-                            log.info("Claude 전송: [{}]", text);
                             emitter.send(SseEmitter.event()
                                     .name("message")
                                     .data(text));
