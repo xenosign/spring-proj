@@ -35,7 +35,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**",
-                                "/", "/health", "/docs/**", "/css/**", "/js/**", "/images/**", "/error"
+                                "/", "/health", "/docs/**", "/css/**", "/js/**", "/images/**", "/error",
+                                "/api/ai/stream" // AI 스트림 허용
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -53,7 +54,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:5173"));
+        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5501"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

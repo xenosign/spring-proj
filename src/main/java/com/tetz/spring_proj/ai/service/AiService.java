@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -16,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -94,26 +92,45 @@ public class AiService {
 
     private void handleGptChunk(SseEmitter emitter, String chunk) {
         try {
-            if (chunk.startsWith("data: ")) {
-                String jsonData = chunk.substring(6).trim();
+            String[] lines = chunk.split("\n");
 
-                if ("[DONE]".equals(jsonData)) return;
+            for (String line : lines) {
+                line = line.trim();
 
-                JsonNode rootNode = objectMapper.readTree(jsonData);
-                JsonNode choices = rootNode.path("choices");
+                if (line.isEmpty()) continue;
 
-                if (choices.isArray() && choices.size() > 0) {
-                    JsonNode delta = choices.get(0).path("delta");
-                    String content = delta.path("content").asText("");
+                if ("[DONE]".equals(line) || "data: [DONE]".equals(line)) {
+                    log.info("GPT 스트림 완료 신호");
+                    continue;
+                }
 
-                    if (!content.isEmpty()) {
-                        emitter.send(SseEmitter.event()
-                                .name("message")
-                                .data(content));
+                String jsonData = line;
+                if (line.startsWith("data: ")) {
+                    jsonData = line.substring(6).trim();
+                    if ("[DONE]".equals(jsonData)) continue;
+                }
+
+                try {
+                    JsonNode rootNode = objectMapper.readTree(jsonData);
+                    JsonNode choices = rootNode.path("choices");
+
+                    if (choices.isArray() && choices.size() > 0) {
+                        JsonNode delta = choices.get(0).path("delta");
+                        String content = delta.path("content").asText("");
+
+                        if (!content.isEmpty()) {
+                            log.info("전송: [{}]", content);
+                            emitter.send(SseEmitter.event()
+                                    .name("message")
+                                    .data(content));
+                        }
                     }
+                } catch (Exception e) {
+                    log.warn("JSON 파싱 실패 (무시): {}", jsonData);
                 }
             }
-        } catch (IOException e) {
+
+        } catch (Exception e) {
             log.error("GPT 청크 처리 중 오류", e);
             emitter.completeWithError(e);
         }
@@ -123,14 +140,16 @@ public class AiService {
     private void streamGeminiResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createGeminiRequestBody(userMessage);
 
+        String modelName = "gemini-1.5-flash";
+        String version = "v1";
+
         webClient.post()
-                .uri("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=" + geminiApiKey)
+                .uri("https://generativelanguage.googleapis.com/" + version + "/models/" + modelName + ":streamGenerateContent?alt=sse&key=" + geminiApiKey)
                 .header("Content-Type", "application/json")
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToFlux(String.class)
-                .flatMap(chunk -> Flux.fromStream(Stream.of(chunk.split("\n")))) // 💡핵심: 줄바꿈 기준으로 분리
-                .filter(s -> !s.trim().isEmpty())
+                .doOnNext(chunk -> log.info("Gemini 청크: {}", chunk))
                 .subscribe(
                         chunk -> handleGeminiChunk(emitter, chunk),
                         error -> handleError(emitter, error),
@@ -149,29 +168,54 @@ public class AiService {
 
         requestBody.put("contents", List.of(content));
 
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("maxOutputTokens", 1000);
+        generationConfig.put("temperature", 0.7);
+        requestBody.put("generationConfig", generationConfig);
+
         return requestBody;
     }
 
     private void handleGeminiChunk(SseEmitter emitter, String chunk) {
         try {
-            JsonNode rootNode = objectMapper.readTree(chunk);
-            JsonNode candidates = rootNode.path("candidates");
+            String[] lines = chunk.split("\n");
 
-            if (candidates.isArray() && candidates.size() > 0) {
-                JsonNode content = candidates.get(0).path("content");
-                JsonNode parts = content.path("parts");
+            for (String line : lines) {
+                line = line.trim();
 
-                if (parts.isArray() && parts.size() > 0) {
-                    String text = parts.get(0).path("text").asText("");
+                if (line.isEmpty()) continue;
 
-                    if (!text.isEmpty()) {
-                        emitter.send(SseEmitter.event()
-                                .name("message")
-                                .data(text));
+                String jsonData = line;
+                if (line.startsWith("data: ")) {
+                    jsonData = line.substring(6).trim();
+                }
+
+                if (jsonData.isEmpty() || jsonData.equals("[DONE]")) continue;
+
+                try {
+                    JsonNode rootNode = objectMapper.readTree(jsonData);
+                    JsonNode candidates = rootNode.path("candidates");
+
+                    if (candidates.isArray() && candidates.size() > 0) {
+                        JsonNode content = candidates.get(0).path("content");
+                        JsonNode parts = content.path("parts");
+
+                        if (parts.isArray() && parts.size() > 0) {
+                            String text = parts.get(0).path("text").asText("");
+
+                            if (!text.isEmpty()) {
+                                log.info("Gemini 전송: [{}]", text);
+                                emitter.send(SseEmitter.event()
+                                        .name("message")
+                                        .data(text));
+                            }
+                        }
                     }
+                } catch (Exception e) {
+                    log.warn("Gemini JSON 파싱 실패: {}", jsonData);
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             log.error("Gemini 청크 처리 중 오류", e);
             emitter.completeWithError(e);
         }
@@ -181,6 +225,8 @@ public class AiService {
     private void streamClaudeResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createClaudeRequestBody(userMessage);
 
+        log.info("Claude 요청 본문: {}", requestBody); // 추가
+
         webClient.post()
                 .uri("https://api.anthropic.com/v1/messages")
                 .header("x-api-key", claudeApiKey)
@@ -189,6 +235,7 @@ public class AiService {
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToFlux(String.class)
+                .doOnError(error -> log.error("Claude Flux 에러", error))
                 .subscribe(
                         chunk -> handleClaudeChunk(emitter, chunk),
                         error -> handleError(emitter, error),
@@ -198,11 +245,11 @@ public class AiService {
 
     private Map<String, Object> createClaudeRequestBody(String userMessage) {
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "claude-3-sonnet-20240229");
+        requestBody.put("model", "claude-3-5-sonnet-20241022"); // 최신 모델로 변경
         requestBody.put("max_tokens", 1024);
         requestBody.put("stream", true);
 
-        Map<String, String> message = new HashMap<>();
+        Map<String, Object> message = new HashMap<>();
         message.put("role", "user");
         message.put("content", userMessage);
 
@@ -213,26 +260,47 @@ public class AiService {
 
     private void handleClaudeChunk(SseEmitter emitter, String chunk) {
         try {
-            if (chunk.startsWith("data: ")) {
-                String jsonData = chunk.substring(6).trim();
+            chunk = chunk.trim();
 
-                if ("[DONE]".equals(jsonData)) return;
+            if (chunk.isEmpty()) return;
 
-                JsonNode rootNode = objectMapper.readTree(jsonData);
+            try {
+                JsonNode rootNode = objectMapper.readTree(chunk);
                 String type = rootNode.path("type").asText("");
 
                 if ("content_block_delta".equals(type)) {
                     JsonNode delta = rootNode.path("delta");
-                    String text = delta.path("text").asText("");
+                    String deltaType = delta.path("type").asText("");
 
-                    if (!text.isEmpty()) {
-                        emitter.send(SseEmitter.event()
-                                .name("message")
-                                .data(text));
+                    if ("text_delta".equals(deltaType)) {
+                        String text = delta.path("text").asText("");
+
+                        if (!text.isEmpty()) {
+                            log.info("Claude 전송: [{}]", text);
+                            emitter.send(SseEmitter.event()
+                                    .name("message")
+                                    .data(text));
+                        }
                     }
+                } else if ("message_start".equals(type)) {
+                    log.info("Claude 메시지 시작");
+                } else if ("content_block_start".equals(type)) {
+                    log.info("Claude 컨텐츠 블록 시작");
+                } else if ("content_block_stop".equals(type)) {
+                    log.info("Claude 컨텐츠 블록 종료");
+                } else if ("message_delta".equals(type)) {
+                    log.info("Claude 메시지 델타");
+                } else if ("message_stop".equals(type)) {
+                    log.info("Claude 메시지 종료");
+                } else if ("ping".equals(type)) {
+                    log.debug("Claude ping");
                 }
+
+            } catch (Exception e) {
+                log.warn("Claude JSON 파싱 실패: {}", chunk, e);
             }
-        } catch (IOException e) {
+
+        } catch (Exception e) {
             log.error("Claude 청크 처리 중 오류", e);
             emitter.completeWithError(e);
         }
@@ -247,7 +315,7 @@ public class AiService {
                     .data("오류 발생: " + error.getMessage()));
         } catch (IOException e) {
             log.error("에러 전송 실패", e);
-            emitter.completeWithError(e); // 💡 개선: 에러 전송 실패 시 최종 처리
+            emitter.completeWithError(e);
         }
         emitter.completeWithError(error);
     }
@@ -260,7 +328,7 @@ public class AiService {
             emitter.complete();
         } catch (IOException e) {
             log.error("완료 이벤트 전송 실패", e);
-            emitter.completeWithError(e); // 💡 개선: 완료 이벤트 전송 실패 시 최종 처리
+            emitter.completeWithError(e);
         }
     }
 
