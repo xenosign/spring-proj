@@ -1,13 +1,14 @@
 package com.tetz.spring_proj.ai.service;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -111,6 +112,9 @@ public class AiService {
                 }
 
                 try {
+                    // 로그 추가: 수신된 JSON 데이터
+                    log.debug("GPT 수신 JSON: {}", jsonData);
+
                     JsonNode rootNode = objectMapper.readTree(jsonData);
                     JsonNode choices = rootNode.path("choices");
 
@@ -119,6 +123,8 @@ public class AiService {
                         String content = delta.path("content").asText("");
 
                         if (!content.isEmpty()) {
+                            // 💡 로그 추가: 클라이언트로 전송되는 실제 텍스트
+                            log.info("📤 GPT 청크 전송: {}", content);
                             emitter.send(SseEmitter.event()
                                     .name("message")
                                     .data(content));
@@ -135,23 +141,44 @@ public class AiService {
         }
     }
 
-    // ========== GEMINI (JSON 배열 형식 스트림) ==========
+    // ========== GEMINI (v1 API 사용 - Flux로 수정) ==========
     private void streamGeminiResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createGeminiRequestBody(userMessage);
 
-        String modelName = "gemini-1.5-flash";
-        String version = "v1";
+        String modelName = "gemini-2.5-flash";
+        String uri = String.format(
+                "https://generativelanguage.googleapis.com/v1/models/%s:streamGenerateContent?alt=sse&key=%s",
+                modelName,
+                geminiApiKey
+        );
+
+        log.info("Gemini 요청 URI: {}", uri.replace(geminiApiKey, "***"));
+        // 요청 본문은 길어질 수 있으므로 주석 처리
+        // log.info("Gemini 요청 본문: {}", requestBody);
 
         webClient.post()
-                .uri("https://generativelanguage.googleapis.com/" + version + "/models/" + modelName + ":streamGenerateContent?alt=sse&key=" + geminiApiKey)
+                .uri(uri)
                 .header("Content-Type", "application/json")
                 .bodyValue(requestBody)
                 .retrieve()
+                .onStatus(
+                        status -> status.is4xxClientError() || status.is5xxServerError(),
+                        response -> response.bodyToMono(String.class)
+                                .flatMap(body -> {
+                                    log.error("Gemini API 에러: {}", body);
+                                    return Mono.error(new RuntimeException("Gemini API 오류: " + body));
+                                })
+                )
+                // 💡 Flux를 사용하여 스트리밍 응답을 청크 단위로 받습니다.
                 .bodyToFlux(String.class)
-                .doOnNext(chunk -> log.info("Gemini 청크: {}", chunk))
+                .doOnSubscribe(s -> log.info("🔵 Gemini 구독 시작"))
+                .doOnError(error -> log.error("🔴 Gemini 에러", error))
                 .subscribe(
+                        // 각 청크를 처리합니다.
                         chunk -> handleGeminiChunk(emitter, chunk),
+                        // 에러 처리
                         error -> handleError(emitter, error),
+                        // 완료 처리
                         () -> handleComplete(emitter)
                 );
     }
@@ -192,6 +219,9 @@ public class AiService {
                 if (jsonData.isEmpty() || jsonData.equals("[DONE]")) continue;
 
                 try {
+                    // 로그 추가: 수신된 JSON 데이터
+                    log.debug("Gemini 수신 JSON: {}", jsonData);
+
                     JsonNode rootNode = objectMapper.readTree(jsonData);
                     JsonNode candidates = rootNode.path("candidates");
 
@@ -203,6 +233,8 @@ public class AiService {
                             String text = parts.get(0).path("text").asText("");
 
                             if (!text.isEmpty()) {
+                                // 💡 로그 포함: 클라이언트로 전송되는 실제 텍스트
+                                log.info("📤 Gemini 청크 전송: {}", text);
                                 emitter.send(SseEmitter.event()
                                         .name("message")
                                         .data(text));
@@ -210,7 +242,7 @@ public class AiService {
                         }
                     }
                 } catch (Exception e) {
-                    log.warn("Gemini JSON 파싱 실패: {}", jsonData);
+                    log.warn("Gemini JSON 파싱 실패: {}", jsonData, e);
                 }
             }
         } catch (Exception e) {
@@ -223,7 +255,7 @@ public class AiService {
     private void streamClaudeResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createClaudeRequestBody(userMessage);
 
-        log.info("Claude 요청 본문: {}", requestBody); // 추가
+        log.info("Claude 요청 본문: {}", requestBody);
 
         webClient.post()
                 .uri("https://api.anthropic.com/v1/messages")
@@ -243,7 +275,7 @@ public class AiService {
 
     private Map<String, Object> createClaudeRequestBody(String userMessage) {
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "claude-3-5-sonnet-20241022"); // 최신 모델로 변경
+        requestBody.put("model", "claude-3-5-sonnet-20241022");
         requestBody.put("max_tokens", 1024);
         requestBody.put("stream", true);
 
@@ -263,6 +295,9 @@ public class AiService {
             if (chunk.isEmpty()) return;
 
             try {
+                // 로그 추가: 수신된 JSON 데이터
+                log.debug("Claude 수신 JSON: {}", chunk);
+
                 JsonNode rootNode = objectMapper.readTree(chunk);
                 String type = rootNode.path("type").asText("");
 
@@ -274,6 +309,8 @@ public class AiService {
                         String text = delta.path("text").asText("");
 
                         if (!text.isEmpty()) {
+                            // 💡 로그 추가: 클라이언트로 전송되는 실제 텍스트
+                            log.info("📤 CLAUDE 청크 전송: {}", text);
                             emitter.send(SseEmitter.event()
                                     .name("message")
                                     .data(text));
@@ -323,8 +360,8 @@ public class AiService {
                     .name("done")
                     .data("완료"));
             emitter.complete();
-        } catch (IOException e) {
-            log.error("완료 이벤트 전송 실패", e);
+        } catch (Exception e) {
+            log.error("완료 이벤트 전송 실패 또는 Emitter 닫기 실패", e);
             emitter.completeWithError(e);
         }
     }
