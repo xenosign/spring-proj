@@ -35,7 +35,8 @@ public class AiService {
     private String claudeApiKey;
 
     public enum AiProvider {
-        GPT, GEMINI, CLAUDE
+        GPT, CLAUDE
+        //, GEMINI
     }
 
     public SseEmitter streamAiResponse(String userMessage, AiProvider provider) {
@@ -45,7 +46,7 @@ public class AiService {
             try {
                 switch (provider) {
                     case GPT -> streamGptResponse(emitter, userMessage);
-                    case GEMINI -> streamGeminiResponse(emitter, userMessage);
+                    // case GEMINI -> streamGeminiResponse(emitter, userMessage);
                     case CLAUDE -> streamClaudeResponse(emitter, userMessage);
                 }
             } catch (Exception e) {
