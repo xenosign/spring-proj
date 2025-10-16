@@ -113,9 +113,6 @@ public class AiService {
                 }
 
                 try {
-                    // 로그 추가: 수신된 JSON 데이터
-                    log.debug("GPT 수신 JSON: {}", jsonData);
-
                     JsonNode rootNode = objectMapper.readTree(jsonData);
                     JsonNode choices = rootNode.path("choices");
 
@@ -124,8 +121,6 @@ public class AiService {
                         String content = delta.path("content").asText("");
 
                         if (!content.isEmpty()) {
-                            // 💡 로그 추가: 클라이언트로 전송되는 실제 텍스트
-                            log.info("📤 GPT 청크 전송: {}", content);
                             emitter.send(SseEmitter.event()
                                     .name("message")
                                     .data(content));
@@ -154,8 +149,6 @@ public class AiService {
         );
 
         log.info("Gemini 요청 URI: {}", uri.replace(geminiApiKey, "***"));
-        // 요청 본문은 길어질 수 있으므로 주석 처리
-        // log.info("Gemini 요청 본문: {}", requestBody);
 
         webClient.post()
                 .uri(uri)
@@ -170,16 +163,12 @@ public class AiService {
                                     return Mono.error(new RuntimeException("Gemini API 오류: " + body));
                                 })
                 )
-                // 💡 Flux를 사용하여 스트리밍 응답을 청크 단위로 받습니다.
                 .bodyToFlux(String.class)
                 .doOnSubscribe(s -> log.info("🔵 Gemini 구독 시작"))
                 .doOnError(error -> log.error("🔴 Gemini 에러", error))
                 .subscribe(
-                        // 각 청크를 처리합니다.
                         chunk -> handleGeminiChunk(emitter, chunk),
-                        // 에러 처리
                         error -> handleError(emitter, error),
-                        // 완료 처리
                         () -> handleComplete(emitter)
                 );
     }
@@ -220,7 +209,6 @@ public class AiService {
                 if (jsonData.isEmpty() || jsonData.equals("[DONE]")) continue;
 
                 try {
-                    // 로그 추가: 수신된 JSON 데이터
                     log.debug("Gemini 수신 JSON: {}", jsonData);
 
                     JsonNode rootNode = objectMapper.readTree(jsonData);
@@ -234,7 +222,6 @@ public class AiService {
                             String text = parts.get(0).path("text").asText("");
 
                             if (!text.isEmpty()) {
-                                // 💡 로그 포함: 클라이언트로 전송되는 실제 텍스트
                                 log.info("📤 Gemini 청크 전송: {}", text);
                                 emitter.send(SseEmitter.event()
                                         .name("message")
@@ -296,7 +283,6 @@ public class AiService {
             if (chunk.isEmpty()) return;
 
             try {
-                // 로그 추가: 수신된 JSON 데이터
                 log.debug("Claude 수신 JSON: {}", chunk);
 
                 JsonNode rootNode = objectMapper.readTree(chunk);
@@ -310,21 +296,11 @@ public class AiService {
                         String text = delta.path("text").asText("");
 
                         if (!text.isEmpty()) {
-                            // 💡 로그 추가: 클라이언트로 전송되는 실제 텍스트
-                            log.info("📤 CLAUDE 청크 전송: {}", text);
                             emitter.send(SseEmitter.event()
                                     .name("message")
                                     .data(text));
                         }
                     }
-                } else if ("message_start".equals(type)) {
-                    log.info("Claude 메시지 시작");
-                } else if ("content_block_start".equals(type)) {
-                    log.info("Claude 컨텐츠 블록 시작");
-                } else if ("content_block_stop".equals(type)) {
-                    log.info("Claude 컨텐츠 블록 종료");
-                } else if ("message_delta".equals(type)) {
-                    log.info("Claude 메시지 델타");
                 } else if ("message_stop".equals(type)) {
                     log.info("Claude 메시지 종료");
                 } else if ("ping".equals(type)) {
