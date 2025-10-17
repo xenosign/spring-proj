@@ -137,7 +137,7 @@ public class AiService {
         }
     }
 
-    // ========== GEMINI (v1 API 사용 - Flux로 수정) ==========
+    // ========== GEMINI ==========
     private void streamGeminiResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createGeminiRequestBody(userMessage);
 
@@ -243,8 +243,6 @@ public class AiService {
     private void streamClaudeResponse(SseEmitter emitter, String userMessage) {
         Map<String, Object> requestBody = createClaudeRequestBody(userMessage);
 
-        log.info("Claude 요청 본문: {}", requestBody);
-
         webClient.post()
                 .uri("https://api.anthropic.com/v1/messages")
                 .header("x-api-key", claudeApiKey)
@@ -283,8 +281,6 @@ public class AiService {
             if (chunk.isEmpty()) return;
 
             try {
-                log.debug("Claude 수신 JSON: {}", chunk);
-
                 JsonNode rootNode = objectMapper.readTree(chunk);
                 String type = rootNode.path("type").asText("");
 
@@ -301,12 +297,9 @@ public class AiService {
                                     .data(text));
                         }
                     }
-                } else if ("message_stop".equals(type)) {
-                    log.info("Claude 메시지 종료");
                 } else if ("ping".equals(type)) {
                     log.debug("Claude ping");
                 }
-
             } catch (Exception e) {
                 log.warn("Claude JSON 파싱 실패: {}", chunk, e);
             }
