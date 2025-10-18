@@ -164,8 +164,6 @@ public class AiService {
                                 })
                 )
                 .bodyToFlux(String.class)
-                .doOnSubscribe(s -> log.info("🔵 Gemini 구독 시작"))
-                .doOnError(error -> log.error("🔴 Gemini 에러", error))
                 .subscribe(
                         chunk -> handleGeminiChunk(emitter, chunk),
                         error -> handleError(emitter, error),
