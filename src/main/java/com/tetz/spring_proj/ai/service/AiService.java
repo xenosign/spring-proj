@@ -138,104 +138,104 @@ public class AiService {
     }
 
     // ========== GEMINI ==========
-    private void streamGeminiResponse(SseEmitter emitter, String userMessage) {
-        Map<String, Object> requestBody = createGeminiRequestBody(userMessage);
-
-        String modelName = "gemini-2.5-flash";
-        String uri = String.format(
-                "https://generativelanguage.googleapis.com/v1/models/%s:streamGenerateContent?alt=sse&key=%s",
-                modelName,
-                geminiApiKey
-        );
-
-        log.info("Gemini 요청 URI: {}", uri.replace(geminiApiKey, "***"));
-
-        webClient.post()
-                .uri(uri)
-                .header("Content-Type", "application/json")
-                .bodyValue(requestBody)
-                .retrieve()
-                .onStatus(
-                        status -> status.is4xxClientError() || status.is5xxServerError(),
-                        response -> response.bodyToMono(String.class)
-                                .flatMap(body -> {
-                                    log.error("Gemini API 에러: {}", body);
-                                    return Mono.error(new RuntimeException("Gemini API 오류: " + body));
-                                })
-                )
-                .bodyToFlux(String.class)
-                .subscribe(
-                        chunk -> handleGeminiChunk(emitter, chunk),
-                        error -> handleError(emitter, error),
-                        () -> handleComplete(emitter)
-                );
-    }
-
-    private Map<String, Object> createGeminiRequestBody(String userMessage) {
-        Map<String, Object> requestBody = new HashMap<>();
-
-        Map<String, String> part = new HashMap<>();
-        part.put("text", userMessage);
-
-        Map<String, Object> content = new HashMap<>();
-        content.put("parts", List.of(part));
-
-        requestBody.put("contents", List.of(content));
-
-        Map<String, Object> generationConfig = new HashMap<>();
-        generationConfig.put("maxOutputTokens", 1000);
-        generationConfig.put("temperature", 0.7);
-        requestBody.put("generationConfig", generationConfig);
-
-        return requestBody;
-    }
-
-    private void handleGeminiChunk(SseEmitter emitter, String chunk) {
-        try {
-            String[] lines = chunk.split("\n");
-
-            for (String line : lines) {
-                line = line.trim();
-
-                if (line.isEmpty()) continue;
-
-                String jsonData = line;
-                if (line.startsWith("data: ")) {
-                    jsonData = line.substring(6).trim();
-                }
-
-                if (jsonData.isEmpty() || jsonData.equals("[DONE]")) continue;
-
-                try {
-                    log.debug("Gemini 수신 JSON: {}", jsonData);
-
-                    JsonNode rootNode = objectMapper.readTree(jsonData);
-                    JsonNode candidates = rootNode.path("candidates");
-
-                    if (candidates.isArray() && candidates.size() > 0) {
-                        JsonNode content = candidates.get(0).path("content");
-                        JsonNode parts = content.path("parts");
-
-                        if (parts.isArray() && parts.size() > 0) {
-                            String text = parts.get(0).path("text").asText("");
-
-                            if (!text.isEmpty()) {
-                                log.info("📤 Gemini 청크 전송: {}", text);
-                                emitter.send(SseEmitter.event()
-                                        .name("message")
-                                        .data(text));
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    log.warn("Gemini JSON 파싱 실패: {}", jsonData, e);
-                }
-            }
-        } catch (Exception e) {
-            log.error("Gemini 청크 처리 중 오류", e);
-            emitter.completeWithError(e);
-        }
-    }
+//    private void streamGeminiResponse(SseEmitter emitter, String userMessage) {
+//        Map<String, Object> requestBody = createGeminiRequestBody(userMessage);
+//
+//        String modelName = "gemini-2.5-flash";
+//        String uri = String.format(
+//                "https://generativelanguage.googleapis.com/v1/models/%s:streamGenerateContent?alt=sse&key=%s",
+//                modelName,
+//                geminiApiKey
+//        );
+//
+//        log.info("Gemini 요청 URI: {}", uri.replace(geminiApiKey, "***"));
+//
+//        webClient.post()
+//                .uri(uri)
+//                .header("Content-Type", "application/json")
+//                .bodyValue(requestBody)
+//                .retrieve()
+//                .onStatus(
+//                        status -> status.is4xxClientError() || status.is5xxServerError(),
+//                        response -> response.bodyToMono(String.class)
+//                                .flatMap(body -> {
+//                                    log.error("Gemini API 에러: {}", body);
+//                                    return Mono.error(new RuntimeException("Gemini API 오류: " + body));
+//                                })
+//                )
+//                .bodyToFlux(String.class)
+//                .subscribe(
+//                        chunk -> handleGeminiChunk(emitter, chunk),
+//                        error -> handleError(emitter, error),
+//                        () -> handleComplete(emitter)
+//                );
+//    }
+//
+//    private Map<String, Object> createGeminiRequestBody(String userMessage) {
+//        Map<String, Object> requestBody = new HashMap<>();
+//
+//        Map<String, String> part = new HashMap<>();
+//        part.put("text", userMessage);
+//
+//        Map<String, Object> content = new HashMap<>();
+//        content.put("parts", List.of(part));
+//
+//        requestBody.put("contents", List.of(content));
+//
+//        Map<String, Object> generationConfig = new HashMap<>();
+//        generationConfig.put("maxOutputTokens", 1000);
+//        generationConfig.put("temperature", 0.7);
+//        requestBody.put("generationConfig", generationConfig);
+//
+//        return requestBody;
+//    }
+//
+//    private void handleGeminiChunk(SseEmitter emitter, String chunk) {
+//        try {
+//            String[] lines = chunk.split("\n");
+//
+//            for (String line : lines) {
+//                line = line.trim();
+//
+//                if (line.isEmpty()) continue;
+//
+//                String jsonData = line;
+//                if (line.startsWith("data: ")) {
+//                    jsonData = line.substring(6).trim();
+//                }
+//
+//                if (jsonData.isEmpty() || jsonData.equals("[DONE]")) continue;
+//
+//                try {
+//                    log.debug("Gemini 수신 JSON: {}", jsonData);
+//
+//                    JsonNode rootNode = objectMapper.readTree(jsonData);
+//                    JsonNode candidates = rootNode.path("candidates");
+//
+//                    if (candidates.isArray() && candidates.size() > 0) {
+//                        JsonNode content = candidates.get(0).path("content");
+//                        JsonNode parts = content.path("parts");
+//
+//                        if (parts.isArray() && parts.size() > 0) {
+//                            String text = parts.get(0).path("text").asText("");
+//
+//                            if (!text.isEmpty()) {
+//                                log.info("📤 Gemini 청크 전송: {}", text);
+//                                emitter.send(SseEmitter.event()
+//                                        .name("message")
+//                                        .data(text));
+//                            }
+//                        }
+//                    }
+//                } catch (Exception e) {
+//                    log.warn("Gemini JSON 파싱 실패: {}", jsonData, e);
+//                }
+//            }
+//        } catch (Exception e) {
+//            log.error("Gemini 청크 처리 중 오류", e);
+//            emitter.completeWithError(e);
+//        }
+//    }
 
     // ========== CLAUDE (SSE) ==========
     private void streamClaudeResponse(SseEmitter emitter, String userMessage) {
