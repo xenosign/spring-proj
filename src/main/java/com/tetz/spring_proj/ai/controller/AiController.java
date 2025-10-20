@@ -5,6 +5,7 @@ import com.tetz.spring_proj.ai.service.AiService.AiProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -28,5 +29,16 @@ public class AiController {
         log.info("AI 스트리밍 요청 수신. Provider: {}, Message: {}", provider, message);
 
         return aiService.streamAiResponse(message, provider);
+    }
+
+    @Operation(summary = "AI 비교 및 종합",
+            description = "두 모델(GPT, CLAUDE)에 같은 메시지를 전달하고 해당 응답의 공통점만을 스트리밍 (할루시네이션 방지용)")
+    @GetMapping("/stream/compare")
+    @PreAuthorize("permitAll()")
+    public SseEmitter streamComparedAiResponse(@RequestParam String message) {
+
+        log.info("AI 비교 스트리밍 요청 수신. Message: {}", message);
+
+        return aiService.streamComparedAiResponse(message);
     }
 }

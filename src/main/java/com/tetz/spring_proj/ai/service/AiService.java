@@ -8,12 +8,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -39,6 +39,7 @@ public class AiService {
         //, GEMINI
     }
 
+    // 각각 AI 서비스(GPT, CLAUDE) 응답 요청
     public SseEmitter streamAiResponse(String userMessage, AiProvider provider) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 
@@ -136,106 +137,6 @@ public class AiService {
             emitter.completeWithError(e);
         }
     }
-
-    // ========== GEMINI ==========
-//    private void streamGeminiResponse(SseEmitter emitter, String userMessage) {
-//        Map<String, Object> requestBody = createGeminiRequestBody(userMessage);
-//
-//        String modelName = "gemini-2.5-flash";
-//        String uri = String.format(
-//                "https://generativelanguage.googleapis.com/v1/models/%s:streamGenerateContent?alt=sse&key=%s",
-//                modelName,
-//                geminiApiKey
-//        );
-//
-//        log.info("Gemini 요청 URI: {}", uri.replace(geminiApiKey, "***"));
-//
-//        webClient.post()
-//                .uri(uri)
-//                .header("Content-Type", "application/json")
-//                .bodyValue(requestBody)
-//                .retrieve()
-//                .onStatus(
-//                        status -> status.is4xxClientError() || status.is5xxServerError(),
-//                        response -> response.bodyToMono(String.class)
-//                                .flatMap(body -> {
-//                                    log.error("Gemini API 에러: {}", body);
-//                                    return Mono.error(new RuntimeException("Gemini API 오류: " + body));
-//                                })
-//                )
-//                .bodyToFlux(String.class)
-//                .subscribe(
-//                        chunk -> handleGeminiChunk(emitter, chunk),
-//                        error -> handleError(emitter, error),
-//                        () -> handleComplete(emitter)
-//                );
-//    }
-//
-//    private Map<String, Object> createGeminiRequestBody(String userMessage) {
-//        Map<String, Object> requestBody = new HashMap<>();
-//
-//        Map<String, String> part = new HashMap<>();
-//        part.put("text", userMessage);
-//
-//        Map<String, Object> content = new HashMap<>();
-//        content.put("parts", List.of(part));
-//
-//        requestBody.put("contents", List.of(content));
-//
-//        Map<String, Object> generationConfig = new HashMap<>();
-//        generationConfig.put("maxOutputTokens", 1000);
-//        generationConfig.put("temperature", 0.7);
-//        requestBody.put("generationConfig", generationConfig);
-//
-//        return requestBody;
-//    }
-//
-//    private void handleGeminiChunk(SseEmitter emitter, String chunk) {
-//        try {
-//            String[] lines = chunk.split("\n");
-//
-//            for (String line : lines) {
-//                line = line.trim();
-//
-//                if (line.isEmpty()) continue;
-//
-//                String jsonData = line;
-//                if (line.startsWith("data: ")) {
-//                    jsonData = line.substring(6).trim();
-//                }
-//
-//                if (jsonData.isEmpty() || jsonData.equals("[DONE]")) continue;
-//
-//                try {
-//                    log.debug("Gemini 수신 JSON: {}", jsonData);
-//
-//                    JsonNode rootNode = objectMapper.readTree(jsonData);
-//                    JsonNode candidates = rootNode.path("candidates");
-//
-//                    if (candidates.isArray() && candidates.size() > 0) {
-//                        JsonNode content = candidates.get(0).path("content");
-//                        JsonNode parts = content.path("parts");
-//
-//                        if (parts.isArray() && parts.size() > 0) {
-//                            String text = parts.get(0).path("text").asText("");
-//
-//                            if (!text.isEmpty()) {
-//                                log.info("📤 Gemini 청크 전송: {}", text);
-//                                emitter.send(SseEmitter.event()
-//                                        .name("message")
-//                                        .data(text));
-//                            }
-//                        }
-//                    }
-//                } catch (Exception e) {
-//                    log.warn("Gemini JSON 파싱 실패: {}", jsonData, e);
-//                }
-//            }
-//        } catch (Exception e) {
-//            log.error("Gemini 청크 처리 중 오류", e);
-//            emitter.completeWithError(e);
-//        }
-//    }
 
     // ========== CLAUDE (SSE) ==========
     private void streamClaudeResponse(SseEmitter emitter, String userMessage) {
@@ -337,5 +238,189 @@ public class AiService {
     @jakarta.annotation.PreDestroy
     public void shutdownExecutor() {
         executor.shutdown();
+    }
+
+    // 각각 AI 서비스(GPT, CLAUDE) 응답 중 공통 부분만 추출하여 응답
+    public SseEmitter streamComparedAiResponse(String userMessage) {
+        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
+
+        executor.execute(() -> {
+            try {
+                StringBuilder gptResponse = new StringBuilder();
+                StringBuilder claudeResponse = new StringBuilder();
+
+                // 두 모델의 응답을 동시에 수집
+                CompletableFuture<String> gptFuture = CompletableFuture.supplyAsync(() -> {
+                    collectGptResponse(gptResponse, userMessage);
+                    return gptResponse.toString();
+                }, executor);
+
+                CompletableFuture<String> claudeFuture = CompletableFuture.supplyAsync(() -> {
+                    collectClaudeResponse(claudeResponse, userMessage);
+                    return claudeResponse.toString();
+                }, executor);
+
+                // 두 응답이 모두 완료될 때까지 대기
+                CompletableFuture.allOf(gptFuture, claudeFuture).join();
+
+                String gptText = gptFuture.get();
+                String claudeText = claudeFuture.get();
+
+                log.info("GPT 응답 수집 완료: {} chars", gptText.length());
+                log.info("Claude 응답 수집 완료: {} chars", claudeText.length());
+
+                streamCommonPoints(emitter, gptText, claudeText, userMessage);
+
+            } catch (Exception e) {
+                log.error("AI 비교 스트리밍 중 오류 발생", e);
+                emitter.completeWithError(e);
+            }
+        });
+
+        return emitter;
+    }
+
+    private void collectGptResponse(StringBuilder result, String userMessage) {
+        Map<String, Object> requestBody = createGptRequestBody(userMessage);
+
+        try {
+            webClient.post()
+                    .uri("https://api.openai.com/v1/chat/completions")
+                    .header("Authorization", "Bearer " + openaiApiKey)
+                    .header("Content-Type", "application/json")
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToFlux(String.class)
+                    .doOnNext(chunk -> {
+                        String content = extractGptContent(chunk);
+                        if (!content.isEmpty()) {
+                            result.append(content);
+                        }
+                    })
+                    .blockLast(); // 모든 청크 수집 완료 대기
+        } catch (Exception e) {
+            log.error("GPT 응답 수집 중 오류", e);
+        }
+    }
+
+    private String extractGptContent(String chunk) {
+        try {
+            String[] lines = chunk.split("\n");
+            StringBuilder content = new StringBuilder();
+
+            for (String line : lines) {
+                line = line.trim();
+                if (line.isEmpty() || "[DONE]".equals(line) || "data: [DONE]".equals(line)) {
+                    continue;
+                }
+
+                String jsonData = line.startsWith("data: ") ? line.substring(6).trim() : line;
+                if ("[DONE]".equals(jsonData)) continue;
+
+                try {
+                    JsonNode rootNode = objectMapper.readTree(jsonData);
+                    JsonNode choices = rootNode.path("choices");
+
+                    if (choices.isArray() && choices.size() > 0) {
+                        JsonNode delta = choices.get(0).path("delta");
+                        String text = delta.path("content").asText("");
+                        content.append(text);
+                    }
+                } catch (Exception e) {
+                    log.debug("GPT JSON 파싱 스킵: {}", jsonData);
+                }
+            }
+
+            return content.toString();
+        } catch (Exception e) {
+            log.error("GPT 컨텐츠 추출 중 오류", e);
+            return "";
+        }
+    }
+
+    private void collectClaudeResponse(StringBuilder result, String userMessage) {
+        Map<String, Object> requestBody = createClaudeRequestBody(userMessage);
+
+        try {
+            webClient.post()
+                    .uri("https://api.anthropic.com/v1/messages")
+                    .header("x-api-key", claudeApiKey)
+                    .header("anthropic-version", "2023-06-01")
+                    .header("Content-Type", "application/json")
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToFlux(String.class)
+                    .doOnNext(chunk -> {
+                        String content = extractClaudeContent(chunk);
+                        if (!content.isEmpty()) {
+                            result.append(content);
+                        }
+                    })
+                    .blockLast(); // 모든 청크 수집 완료 대기
+        } catch (Exception e) {
+            log.error("Claude 응답 수집 중 오류", e);
+        }
+    }
+
+    private String extractClaudeContent(String chunk) {
+        try {
+            chunk = chunk.trim();
+            if (chunk.isEmpty()) return "";
+
+            JsonNode rootNode = objectMapper.readTree(chunk);
+            String type = rootNode.path("type").asText("");
+
+            if ("content_block_delta".equals(type)) {
+                JsonNode delta = rootNode.path("delta");
+                String deltaType = delta.path("type").asText("");
+
+                if ("text_delta".equals(deltaType)) {
+                    return delta.path("text").asText("");
+                }
+            }
+
+            return "";
+        } catch (Exception e) {
+            log.debug("Claude JSON 파싱 스킵: {}", chunk);
+            return "";
+        }
+    }
+
+    private void streamCommonPoints(SseEmitter emitter, String gptText, String claudeText, String originalMessage) {
+        try {
+            String analysisPrompt = String.format("""
+        다음은 같은 질문에 대한 두 AI 모델의 응답입니다.
+        
+        질문: %s
+        
+        [GPT 응답]
+        %s
+        
+        [Claude 응답]
+        %s
+        
+        두 응답의 공통된 핵심 내용만을 추출하여 간결하게 정리해주세요.
+        서로 다른 내용이나 모순되는 부분은 제외하고, 두 모델이 모두 동의하는 사실과 정보만 포함하세요.
+        """, originalMessage, gptText, claudeText);
+
+            Map<String, Object> requestBody = createGptRequestBody(analysisPrompt);
+
+            webClient.post()
+                    .uri("https://api.openai.com/v1/chat/completions")
+                    .header("Authorization", "Bearer " + openaiApiKey)
+                    .header("Content-Type", "application/json")
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToFlux(String.class)
+                    .subscribe(
+                            chunk -> handleGptChunk(emitter, chunk),
+                            error -> handleError(emitter, error),
+                            () -> handleComplete(emitter)
+                    );
+
+        } catch (Exception e) {
+            log.error("공통점 추출 중 오류", e);
+            emitter.completeWithError(e);
+        }
     }
 }
