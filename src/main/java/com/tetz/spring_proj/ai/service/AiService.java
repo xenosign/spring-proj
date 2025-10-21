@@ -324,7 +324,7 @@ public class AiService {
         executor.shutdown();
     }
 
-    // 각각 AI 서비스(GPT, CLAUDE) 응답 중 공통 부분만 추출하여 응답
+    // 각각 AI 서비스(GPT, CLAUDE, GEMINI) 응답 중 공통 부분만 추출하여 응답
     public SseEmitter streamComparedAiResponse(String userMessage) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 
@@ -332,8 +332,8 @@ public class AiService {
             try {
                 StringBuilder gptResponse = new StringBuilder();
                 StringBuilder claudeResponse = new StringBuilder();
+                StringBuilder geminiResponse = new StringBuilder();
 
-                // 두 모델의 응답을 동시에 수집
                 CompletableFuture<String> gptFuture = CompletableFuture.supplyAsync(() -> {
                     collectGptResponse(gptResponse, userMessage);
                     return gptResponse.toString();
@@ -344,16 +344,22 @@ public class AiService {
                     return claudeResponse.toString();
                 }, executor);
 
-                // 두 응답이 모두 완료될 때까지 대기
-                CompletableFuture.allOf(gptFuture, claudeFuture).join();
+                CompletableFuture<String> geminiFuture = CompletableFuture.supplyAsync(() -> {
+                    collectGeminiResponse(geminiResponse, userMessage);
+                    return geminiResponse.toString();
+                }, executor);
+
+                CompletableFuture.allOf(gptFuture, claudeFuture, geminiFuture).join();
 
                 String gptText = gptFuture.get();
                 String claudeText = claudeFuture.get();
+                String geminiText = geminiFuture.get();
 
                 log.info("GPT 응답 수집 완료: {} chars", gptText.length());
                 log.info("Claude 응답 수집 완료: {} chars", claudeText.length());
+                log.info("Gemini 응답 수집 완료: {} chars", geminiText.length());
 
-                streamCommonPoints(emitter, gptText, claudeText, userMessage);
+                streamCommonPoints(emitter, gptText, claudeText, geminiText, userMessage);
 
             } catch (Exception e) {
                 log.error("AI 비교 스트리밍 중 오류 발생", e);
@@ -381,7 +387,7 @@ public class AiService {
                             result.append(content);
                         }
                     })
-                    .blockLast(); // 모든 청크 수집 완료 대기
+                    .blockLast();
         } catch (Exception e) {
             log.error("GPT 응답 수집 중 오류", e);
         }
@@ -440,7 +446,7 @@ public class AiService {
                             result.append(content);
                         }
                     })
-                    .blockLast(); // 모든 청크 수집 완료 대기
+                    .blockLast();
         } catch (Exception e) {
             log.error("Claude 응답 수집 중 오류", e);
         }
@@ -470,10 +476,76 @@ public class AiService {
         }
     }
 
-    private void streamCommonPoints(SseEmitter emitter, String gptText, String claudeText, String originalMessage) {
+    private void collectGeminiResponse(StringBuilder result, String userMessage) {
+        Map<String, Object> requestBody = createGeminiRequestBody(userMessage);
+
+        String uri = String.format(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?key=%s&alt=sse",
+                geminiApiKey
+        );
+
+        try {
+            webClient.post()
+                    .uri(uri)
+                    .header("Content-Type", "application/json")
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToFlux(String.class)
+                    .doOnNext(chunk -> {
+                        String content = extractGeminiContent(chunk);
+                        if (!content.isEmpty()) {
+                            result.append(content);
+                        }
+                    })
+                    .blockLast();
+        } catch (Exception e) {
+            log.error("Gemini 응답 수집 중 오류", e);
+        }
+    }
+
+    private String extractGeminiContent(String chunk) {
+        try {
+            String[] lines = chunk.split("\n");
+            StringBuilder content = new StringBuilder();
+
+            for (String line : lines) {
+                line = line.trim();
+                if (line.isEmpty()) continue;
+
+                String jsonData = line.startsWith("data: ") ? line.substring(6).trim() : line;
+                if (jsonData.isEmpty()) continue;
+
+                try {
+                    JsonNode rootNode = objectMapper.readTree(jsonData);
+                    JsonNode candidates = rootNode.path("candidates");
+
+                    if (candidates.isArray() && candidates.size() > 0) {
+                        JsonNode candidate = candidates.get(0);
+                        JsonNode contentNode = candidate.path("content");
+                        JsonNode parts = contentNode.path("parts");
+
+                        if (parts.isArray() && parts.size() > 0) {
+                            JsonNode part = parts.get(0);
+                            String text = part.path("text").asText("");
+                            content.append(text);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("Gemini JSON 파싱 스킵: {}", jsonData);
+                }
+            }
+
+            return content.toString();
+        } catch (Exception e) {
+            log.error("Gemini 컨텐츠 추출 중 오류", e);
+            return "";
+        }
+    }
+
+    private void streamCommonPoints(SseEmitter emitter, String gptText, String claudeText, String geminiText, String originalMessage) {
         try {
             String analysisPrompt = String.format("""
-        다음은 같은 질문에 대한 두 AI 모델의 응답입니다.
+        다음은 같은 질문에 대한 세 AI 모델의 응답입니다.
         
         질문: %s
         
@@ -483,9 +555,12 @@ public class AiService {
         [Claude 응답]
         %s
         
-        두 응답의 공통된 핵심 내용만을 추출하여 간결하게 정리해주세요.
-        서로 다른 내용이나 모순되는 부분은 제외하고, 두 모델이 모두 동의하는 사실과 정보만 포함하세요.
-        """, originalMessage, gptText, claudeText);
+        [Gemini 응답]
+        %s
+        
+        세 응답의 공통된 핵심 내용만을 추출하여 간결하게 정리해주세요.
+        서로 다른 내용이나 모순되는 부분은 제외하고, 세 모델이 모두 동의하는 사실과 정보만 포함하세요.
+        """, originalMessage, gptText, claudeText, geminiText);
 
             Map<String, Object> requestBody = createGptRequestBody(analysisPrompt);
 
