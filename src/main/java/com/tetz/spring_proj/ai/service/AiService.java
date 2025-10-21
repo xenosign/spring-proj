@@ -35,11 +35,10 @@ public class AiService {
     private String claudeApiKey;
 
     public enum AiProvider {
-        GPT, CLAUDE
-        //, GEMINI
+        GPT, CLAUDE, GEMINI
     }
 
-    // 각각 AI 서비스(GPT, CLAUDE) 응답 요청
+    // 각각 AI 서비스(GPT, CLAUDE, GEMINI) 응답 요청
     public SseEmitter streamAiResponse(String userMessage, AiProvider provider) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 
@@ -47,8 +46,8 @@ public class AiService {
             try {
                 switch (provider) {
                     case GPT -> streamGptResponse(emitter, userMessage);
-                    // case GEMINI -> streamGeminiResponse(emitter, userMessage);
                     case CLAUDE -> streamClaudeResponse(emitter, userMessage);
+                    case GEMINI -> streamGeminiResponse(emitter, userMessage);
                 }
             } catch (Exception e) {
                 log.error("AI 스트리밍 중 오류 발생: {}", provider, e);
@@ -231,6 +230,91 @@ public class AiService {
             emitter.complete();
         } catch (Exception e) {
             log.error("완료 이벤트 전송 실패 또는 Emitter 닫기 실패", e);
+            emitter.completeWithError(e);
+        }
+    }
+
+    // ========== GEMINI (SSE) ==========
+    private void streamGeminiResponse(SseEmitter emitter, String userMessage) {
+        Map<String, Object> requestBody = createGeminiRequestBody(userMessage);
+
+        String uri = String.format(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?key=%s&alt=sse",
+                geminiApiKey
+        );
+
+        webClient.post()
+                .uri(uri)
+                .header("Content-Type", "application/json")
+                .bodyValue(requestBody)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .doOnError(error -> log.error("Gemini Flux 에러", error))
+                .subscribe(
+                        chunk -> handleGeminiChunk(emitter, chunk),
+                        error -> handleError(emitter, error),
+                        () -> handleComplete(emitter)
+                );
+    }
+
+    private Map<String, Object> createGeminiRequestBody(String userMessage) {
+        Map<String, Object> requestBody = new HashMap<>();
+
+        Map<String, Object> part = new HashMap<>();
+        part.put("text", userMessage);
+
+        Map<String, Object> content = new HashMap<>();
+        content.put("role", "user");
+        content.put("parts", List.of(part));
+
+        requestBody.put("contents", List.of(content));
+
+        return requestBody;
+    }
+
+    private void handleGeminiChunk(SseEmitter emitter, String chunk) {
+        try {
+            String[] lines = chunk.split("\n");
+
+            for (String line : lines) {
+                line = line.trim();
+
+                if (line.isEmpty()) continue;
+
+                String jsonData = line;
+                if (line.startsWith("data: ")) {
+                    jsonData = line.substring(6).trim();
+                }
+
+                if (jsonData.isEmpty()) continue;
+
+                try {
+                    JsonNode rootNode = objectMapper.readTree(jsonData);
+                    JsonNode candidates = rootNode.path("candidates");
+
+                    if (candidates.isArray() && candidates.size() > 0) {
+                        JsonNode candidate = candidates.get(0);
+                        JsonNode content = candidate.path("content");
+                        JsonNode parts = content.path("parts");
+
+                        if (parts.isArray() && parts.size() > 0) {
+                            JsonNode part = parts.get(0);
+                            String text = part.path("text").asText("");
+
+                            if (!text.isEmpty()) {
+                                emitter.send(SseEmitter.event()
+                                        .name("message")
+                                        .data(text));
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Gemini JSON 파싱 실패: {}", jsonData, e);
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("Gemini 청크 처리 중 오류", e);
             emitter.completeWithError(e);
         }
     }
