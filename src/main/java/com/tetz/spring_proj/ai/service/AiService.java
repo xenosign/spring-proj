@@ -38,6 +38,8 @@ public class AiService {
         GPT, CLAUDE, GEMINI
     }
 
+    // ================== AI 스트리밍 ==================
+
     // 각각 AI 서비스(GPT, CLAUDE, GEMINI) 응답 요청
     public SseEmitter streamAiResponse(String userMessage, AiProvider provider) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
@@ -323,6 +325,8 @@ public class AiService {
     public void shutdownExecutor() {
         executor.shutdown();
     }
+
+    // ================== AI 공통 파트 추출 ==================
 
     // 각각 AI 서비스(GPT, CLAUDE, GEMINI) 응답 중 공통 부분만 추출하여 응답
     public SseEmitter streamComparedAiResponse(String userMessage) {
