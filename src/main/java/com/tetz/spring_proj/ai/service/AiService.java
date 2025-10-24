@@ -117,7 +117,7 @@ public class AiService {
                     JsonNode rootNode = objectMapper.readTree(jsonData);
                     JsonNode choices = rootNode.path("choices");
 
-                    if (choices.isArray() && choices.size() > 0) {
+                    if (choices.isArray() && !choices.isEmpty()) {
                         JsonNode delta = choices.get(0).path("delta");
                         String content = delta.path("content").asText("");
 
@@ -293,12 +293,12 @@ public class AiService {
                     JsonNode rootNode = objectMapper.readTree(jsonData);
                     JsonNode candidates = rootNode.path("candidates");
 
-                    if (candidates.isArray() && candidates.size() > 0) {
+                    if (candidates.isArray() && !candidates.isEmpty()) {
                         JsonNode candidate = candidates.get(0);
                         JsonNode content = candidate.path("content");
                         JsonNode parts = content.path("parts");
 
-                        if (parts.isArray() && parts.size() > 0) {
+                        if (parts.isArray() && !parts.isEmpty()) {
                             JsonNode part = parts.get(0);
                             String text = part.path("text").asText("");
 
@@ -413,7 +413,7 @@ public class AiService {
                     JsonNode rootNode = objectMapper.readTree(jsonData);
                     JsonNode choices = rootNode.path("choices");
 
-                    if (choices.isArray() && choices.size() > 0) {
+                    if (choices.isArray() && !choices.isEmpty()) {
                         JsonNode delta = choices.get(0).path("delta");
                         String text = delta.path("content").asText("");
                         content.append(text);
@@ -521,12 +521,12 @@ public class AiService {
                     JsonNode rootNode = objectMapper.readTree(jsonData);
                     JsonNode candidates = rootNode.path("candidates");
 
-                    if (candidates.isArray() && candidates.size() > 0) {
+                    if (candidates.isArray() && !candidates.isEmpty()) {
                         JsonNode candidate = candidates.get(0);
                         JsonNode contentNode = candidate.path("content");
                         JsonNode parts = contentNode.path("parts");
 
-                        if (parts.isArray() && parts.size() > 0) {
+                        if (parts.isArray() && !parts.isEmpty()) {
                             JsonNode part = parts.get(0);
                             String text = part.path("text").asText("");
                             content.append(text);
