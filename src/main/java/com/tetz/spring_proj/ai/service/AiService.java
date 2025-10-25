@@ -209,7 +209,6 @@ public class AiService {
         }
     }
 
-    // ========== 공통 처리 ==========
     private void handleError(SseEmitter emitter, Throwable error) {
         log.error("AI API 호출 중 오류 발생", error);
         try {
