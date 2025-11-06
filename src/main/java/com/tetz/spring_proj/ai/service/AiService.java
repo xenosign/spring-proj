@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -143,6 +144,7 @@ public class AiService {
         Map<String, Object> requestBody = createClaudeRequestBody(userMessage);
 
         webClient.post()
+//                .uri("https://api.anthropic.com/v1/messages")
                 .uri("https://api.anthropic.com/v1/messages")
                 .header("x-api-key", claudeApiKey)
                 .header("anthropic-version", "2023-06-01")
@@ -160,7 +162,7 @@ public class AiService {
 
     private Map<String, Object> createClaudeRequestBody(String userMessage) {
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "claude-3-5-sonnet-20241022");
+        requestBody.put("model", "claude-sonnet-4-5");
         requestBody.put("max_tokens", 1024);
         requestBody.put("stream", true);
 
@@ -205,31 +207,6 @@ public class AiService {
 
         } catch (Exception e) {
             log.error("Claude 청크 처리 중 오류", e);
-            emitter.completeWithError(e);
-        }
-    }
-
-    private void handleError(SseEmitter emitter, Throwable error) {
-        log.error("AI API 호출 중 오류 발생", error);
-        try {
-            emitter.send(SseEmitter.event()
-                    .name("error")
-                    .data("오류 발생: " + error.getMessage()));
-        } catch (IOException e) {
-            log.error("에러 전송 실패", e);
-            emitter.completeWithError(e);
-        }
-        emitter.completeWithError(error);
-    }
-
-    private void handleComplete(SseEmitter emitter) {
-        try {
-            emitter.send(SseEmitter.event()
-                    .name("done")
-                    .data("완료"));
-            emitter.complete();
-        } catch (Exception e) {
-            log.error("완료 이벤트 전송 실패 또는 Emitter 닫기 실패", e);
             emitter.completeWithError(e);
         }
     }
@@ -315,6 +292,32 @@ public class AiService {
 
         } catch (Exception e) {
             log.error("Gemini 청크 처리 중 오류", e);
+            emitter.completeWithError(e);
+        }
+    }
+
+    // 공통 에러 처리
+    private void handleError(SseEmitter emitter, Throwable error) {
+        log.error("AI API 호출 중 오류 발생", error);
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("error")
+                    .data("오류 발생: " + error.getMessage()));
+        } catch (IOException e) {
+            log.error("에러 전송 실패", e);
+            emitter.completeWithError(e);
+        }
+        emitter.completeWithError(error);
+    }
+
+    private void handleComplete(SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("done")
+                    .data("완료"));
+            emitter.complete();
+        } catch (Exception e) {
+            log.error("완료 이벤트 전송 실패 또는 Emitter 닫기 실패", e);
             emitter.completeWithError(e);
         }
     }
