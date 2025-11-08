@@ -14,6 +14,11 @@ type Query {
     모든 할 일 목록을 조회합니다.
     """
     getAllTodos: [TodoResponseDto]
+
+    """
+    도시와 국가 코드로 날씨 정보를 조회합니다.
+    """
+    getWeather(city: String!): WeatherResponseDto
 }
 
 # 환율(Exchange Rate) 관련 타입
@@ -42,4 +47,71 @@ type TodoResponseDto {
     task: String!
     completed: Boolean!
     createdAt: String!
+}
+
+# 날씨(Weather) 관련 타입
+"""
+날씨 API의 전체 응답
+"""
+# 날씨(Weather) 관련 타입
+type WeatherResponseDto {
+    coord: Coord
+    weather: [Weather]
+    base: String
+    main: Main
+    visibility: Int
+    wind: Wind
+    rain: Rain
+    clouds: Clouds
+    dt: Int
+    sys: Sys
+    timezone: Int
+    id: Int
+    name: String
+    cod: Int
+}
+
+type Coord {
+    lon: Float
+    lat: Float
+}
+
+type Weather {
+    id: Int
+    main: String
+    description: String
+    icon: String
+}
+
+type Main {
+    temp: Float
+    feelsLike: Float
+    tempMin: Float
+    tempMax: Float
+    pressure: Int
+    humidity: Int
+    seaLevel: Int
+    grndLevel: Int
+}
+
+type Wind {
+    speed: Float
+    deg: Int
+    gust: Float
+}
+
+type Rain {
+    oneHour: Float
+}
+
+type Clouds {
+    all: Int
+}
+
+type Sys {
+    type: Int
+    id: Int
+    country: String
+    sunrise: Int
+    sunset: Int
 }

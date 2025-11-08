@@ -25,34 +25,8 @@ public class WeatherController {
     public Mono<WeatherResponseDto> getWeather(
             @RequestParam String city,
             @RequestParam(required = false) String country) {
-
         Mono<WeatherResponseDto> result = weatherService.getWeatherAsync(city, country);
         log.info("getWeather called {}", result);
         return result;
-    }
-
-    @GetMapping("/cities")
-    public Flux<WeatherResponseDto> getWeatherForCities(
-            @RequestParam WeatherRequestDto request) {
-        return weatherService.getWeatherForCitiesAsync(request.getCities());
-    }
-
-    @GetMapping("/coordinates")
-    public Mono<WeatherResponseDto> getWeatherByCoordinates(
-            @RequestParam Double lat,
-            @RequestParam Double lon) {
-        return weatherService.getWeatherByCoordinatesAsync(lat, lon);
-    }
-
-    @PostMapping
-    public Flux<WeatherResponseDto> getWeatherByRequest(
-            @RequestBody WeatherRequestDto request) {
-        return weatherService.getWeatherAsync(request);
-    }
-
-    @PostMapping("/batch")
-    public Flux<WeatherResponseDto> getWeatherBatch(
-            @RequestBody List<WeatherRequestDto.CityRequest> cities) {
-        return weatherService.getWeatherForCitiesAsync(cities);
     }
 }
