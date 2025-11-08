@@ -42,7 +42,8 @@ public class SecurityConfig {
                                 "/", "/health", "/docs/**", "/css/**", "/js/**", "/images/**", "/error",
                                 "/api/ai/**",
                                 "/api/v1/weather",
-                                "/graphql"
+                                "/graphql",
+                                "/graphiql"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -60,7 +61,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5501", "http://127.0.0.1:5599"));
+        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5500", "http://127.0.0.1:5599"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

@@ -25,6 +25,11 @@ public class GraphqlApiController {
     private final WeatherService weatherService;
 
     @QueryMapping
+    public ExchangeRateResponseDto allExchangeRates() {
+        return exchangeRateService.getAllExchangeRatesAsync();
+    }
+
+    @QueryMapping
     public ExchangeRateResponseDto specificExchangeRates(@Argument List<String> currencyCodes) {
         return exchangeRateService.getSpecificExchangeRatesAsync(currencyCodes);
     }
