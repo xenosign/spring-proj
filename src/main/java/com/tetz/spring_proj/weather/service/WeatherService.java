@@ -13,9 +13,6 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 
-// Todo
-// 환율도 WebClient 방식으로 변경 및 Security 필터에 Reactive 적용 필요
-
 @Slf4j
 @Service
 public class WeatherService {
