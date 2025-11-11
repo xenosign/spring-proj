@@ -35,7 +35,6 @@ public class SecurityConfig {
                 ))
                 .httpBasic(basic -> basic.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // 인증이 필요 없는 공개 경로 설정
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**",
