@@ -3,6 +3,7 @@ package com.tetz.spring_proj.ai.controller;
 import com.tetz.spring_proj.ai.service.AiService;
 import com.tetz.spring_proj.ai.service.AiService.AiProvider;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,9 +14,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
-@RequestMapping("/api/ai")
 @RequiredArgsConstructor
 @Slf4j
+@RequestMapping("/api/ai")
+@Tag(name = "AI 스트리밍 API", description = "GPT, CLAUDE, GEMINI 에 대한 스트리밍 서비스")
 public class AiController {
     private final AiService aiService;
 

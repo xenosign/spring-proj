@@ -46,4 +46,11 @@ public class GraphqlApiController {
         return weatherService.getWeatherAsync(city, country)
                 .block();
     }
+
+    @QueryMapping
+    public WeatherResponseDto getWeatherByCoordinates(
+            @Argument Double lat,
+            @Argument Double lon) {
+        return weatherService.getWeatherByCoordinatesAsync(lat, lon).block();
+    }
 }
