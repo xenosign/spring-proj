@@ -40,9 +40,10 @@ public class GraphqlApiController {
     }
 
     @QueryMapping
-    public Mono<WeatherResponseDto> getWeather(
+    public WeatherResponseDto getWeather(
             @Argument String city,
             @Argument String country) {
-        return weatherService.getWeatherAsync(city, country);
+        return weatherService.getWeatherAsync(city, country)
+                .block();
     }
 }

@@ -1,4 +1,4 @@
-package com.tetz.spring_proj.common.security;
+package com.tetz.spring_proj.security;
 
 import com.tetz.spring_proj.auth.filter.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
@@ -39,9 +39,6 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**",
                                 "/", "/health", "/docs/**", "/css/**", "/js/**", "/images/**", "/error",
-                                "/api/ai/**",
-                                "/api/v1/weather",
-                                "/graphql",
                                 "/graphiql"
                         ).permitAll()
                         .anyRequest().authenticated()
@@ -61,7 +58,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5500", "http://127.0.0.1:5599"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 

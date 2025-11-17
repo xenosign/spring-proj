@@ -1,6 +1,6 @@
 package com.tetz.spring_proj.auth.util;
 
-import com.tetz.spring_proj.common.security.auth.JwtUtil;
+import com.tetz.spring_proj.security.auth.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
