@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.concurrent.DelegatingSecurityContextExecutorService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -24,7 +25,10 @@ import java.util.concurrent.Executors;
 public class AiService {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+
+    private final ExecutorService executor = new DelegatingSecurityContextExecutorService(
+            Executors.newCachedThreadPool()
+    );
 
     @Value("${ai.openai.api-key}")
     private String openaiApiKey;
