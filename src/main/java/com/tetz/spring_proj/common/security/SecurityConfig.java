@@ -1,4 +1,4 @@
-package com.tetz.spring_proj.security;
+package com.tetz.spring_proj.common.security;
 
 import com.tetz.spring_proj.auth.filter.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;

@@ -1,4 +1,4 @@
-package com.tetz.spring_proj.security.auth;
+package com.tetz.spring_proj.common.jwt;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;

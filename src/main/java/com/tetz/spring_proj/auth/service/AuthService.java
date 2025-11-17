@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tetz.spring_proj.auth.dto.AuthResponse;
 import com.tetz.spring_proj.auth.dto.KakaoUserInfo;
 import com.tetz.spring_proj.auth.dto.KakaoTokenResponse;
-import com.tetz.spring_proj.security.auth.JwtUtil;
+import com.tetz.spring_proj.common.jwt.JwtUtil;
 import com.tetz.spring_proj.user.service.UserService;
 import com.tetz.spring_proj.user.domain.UserEntity;
 import lombok.RequiredArgsConstructor;

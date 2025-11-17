@@ -1,6 +1,6 @@
 package com.tetz.spring_proj.auth.filter;
 
-import com.tetz.spring_proj.security.auth.JwtUtil;
+import com.tetz.spring_proj.common.jwt.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
