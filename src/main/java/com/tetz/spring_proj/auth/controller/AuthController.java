@@ -56,13 +56,13 @@ public class AuthController {
             jwtCookie.setSecure(kakaoCookieSecure);
             jwtCookie.setPath("/");
             jwtCookie.setMaxAge((int) (jwtExpiration / 1000));
+            jwtCookie.setAttribute("SameSite", "None");
             response.addCookie(jwtCookie);
 
             if ("backend".equals(state)) {
                 return ResponseEntity.ok(authResponse);
             } else {
-                String redirectUrl = kakaoFrontRedirectUrl +
-                        "?token=" + authResponse.getAccessToken();
+                String redirectUrl = kakaoFrontRedirectUrl;
                 return new RedirectView(redirectUrl);
             }
 
@@ -96,6 +96,7 @@ public class AuthController {
             jwtCookie.setSecure(true); // 개발환경에서는 false
             jwtCookie.setPath("/");
             jwtCookie.setMaxAge((int) (jwtExpiration / 1000));
+            jwtCookie.setAttribute("SameSite", "None");
 
             response.addCookie(jwtCookie);
 
