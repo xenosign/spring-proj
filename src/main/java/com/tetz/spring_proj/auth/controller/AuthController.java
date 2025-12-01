@@ -61,7 +61,8 @@ public class AuthController {
             if ("backend".equals(state)) {
                 return ResponseEntity.ok(authResponse);
             } else {
-                String redirectUrl = kakaoFrontRedirectUrl;
+                String redirectUrl = kakaoFrontRedirectUrl +
+                        "?token=" + authResponse.getAccessToken();
                 return new RedirectView(redirectUrl);
             }
 
