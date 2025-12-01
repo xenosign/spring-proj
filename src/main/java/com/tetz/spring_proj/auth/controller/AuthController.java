@@ -57,6 +57,7 @@ public class AuthController {
             jwtCookie.setPath("/");
             jwtCookie.setMaxAge((int) (jwtExpiration / 1000));
             jwtCookie.setAttribute("SameSite", "None");
+
             response.addCookie(jwtCookie);
 
             if ("backend".equals(state)) {
