@@ -56,7 +56,6 @@ public class AuthController {
             jwtCookie.setSecure(kakaoCookieSecure);
             jwtCookie.setPath("/");
             jwtCookie.setMaxAge((int) (jwtExpiration / 1000));
-            jwtCookie.setAttribute("SameSite", "None");
 
             response.addCookie(jwtCookie);
 
@@ -94,10 +93,9 @@ public class AuthController {
             // JWT 토큰을 쿠키에 설정
             Cookie jwtCookie = new Cookie("jwt", authResponse.getAccessToken());
             jwtCookie.setHttpOnly(true);
-            jwtCookie.setSecure(true); // 개발환경에서는 false
+            jwtCookie.setSecure(kakaoCookieSecure); // 개발환경에서는 false
             jwtCookie.setPath("/");
             jwtCookie.setMaxAge((int) (jwtExpiration / 1000));
-            jwtCookie.setAttribute("SameSite", "None");
 
             response.addCookie(jwtCookie);
 
