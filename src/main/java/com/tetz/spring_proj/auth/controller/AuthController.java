@@ -56,6 +56,7 @@ public class AuthController {
             jwtCookie.setSecure(kakaoCookieSecure);
             jwtCookie.setPath("/");
             jwtCookie.setMaxAge((int) (jwtExpiration / 1000));
+            jwtCookie.setAttribute("SameSite", "None");
             response.addCookie(jwtCookie);
 
             if ("backend".equals(state)) {
@@ -96,6 +97,7 @@ public class AuthController {
             jwtCookie.setSecure(true); // 개발환경에서는 false
             jwtCookie.setPath("/");
             jwtCookie.setMaxAge((int) (jwtExpiration / 1000));
+            jwtCookie.setAttribute("SameSite", "None");
 
             response.addCookie(jwtCookie);
 
@@ -114,6 +116,7 @@ public class AuthController {
         jwtCookie.setSecure(true); // 개발환경에서는 false
         jwtCookie.setPath("/");
         jwtCookie.setMaxAge(0); // 즉시 만료
+        jwtCookie.setAttribute("SameSite", "None");
 
         response.addCookie(jwtCookie);
 
