@@ -59,11 +59,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // HTTP 헤더에서 토큰 추출, Swagger 테스트 및 추후 사용을 위해 남겨 둠 -> 기본은 쿠키에서 파싱
         String bearerToken = request.getHeader("Authorization");
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            log.info("Header: {} is bearer token", bearerToken);
             return bearerToken.substring(7);
         }
 
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
+                log.info("Cookie: {} is bearer token", cookie.getName());
                 if ("jwt".equals(cookie.getName()) &&
                         cookie.getValue() != null &&
                         !cookie.getValue().isEmpty()) {
