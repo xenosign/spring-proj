@@ -21,11 +21,14 @@ public class HomeController {
                 <a href="./swagger-ui/index.html" target="_blank">
                     <h1>🚀 스웨거 바로가기</h1>
                 </a>
+                <a href="./graphiql" target="_blank">
+                    <h1>📈 그래피큐엘 바로가기</h1>
+                </a>
                 <a href="./api/auth/kakao" target="_blank">
-                    <h1>🍋 카카오 로그인 임시 테스트 - 프론트 리다이렉트</h1>
+                    <h1>🍫 카카오 로그인 임시 테스트 - 프론트 리다이렉트</h1>
                 </a>
                 <a href="./api/auth/kakao/backend" target="_blank">
-                    <h1>🍋 카카오 로그인 임시 테스트 - 백엔드 응답</h1>
+                    <h1>🍪 카카오 로그인 임시 테스트 - 백엔드 응답</h1>
                 </a>
             </body>
             </html>
