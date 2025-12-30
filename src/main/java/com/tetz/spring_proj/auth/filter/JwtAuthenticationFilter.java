@@ -39,6 +39,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(auth);
 
             log.debug("JWT 인증 성공: userId={}, email={}", userId, email);
+
+            request.setAttribute("userId", userId);
         }
 
         filterChain.doFilter(request, response);

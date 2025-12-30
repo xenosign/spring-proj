@@ -1,4 +1,4 @@
-package com.tetz.spring_proj.tetznight.dto;
+package com.tetz.spring_proj.tetznight.dto.poll;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;

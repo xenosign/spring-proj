@@ -1,4 +1,4 @@
-package com.tetz.spring_proj.tetznight.domain.vote;
+package com.tetz.spring_proj.tetznight.domain.poll;
 
 import jakarta.persistence.*;
 import lombok.Getter;
