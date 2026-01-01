@@ -58,10 +58,8 @@ public class TetzNightController {
 
         PollResponse response;
         if (userId != null) {
-            // 로그인한 경우: 사용자의 투표 정보 포함
             response = pollService.getPollDetailByIdWithUser(pollId, userId);
         } else {
-            // 비로그인: 투표 결과만 포함
             response = pollService.getPollDetailById(pollId);
         }
 

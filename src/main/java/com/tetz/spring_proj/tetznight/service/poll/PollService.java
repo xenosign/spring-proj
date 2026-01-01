@@ -36,14 +36,6 @@ public class PollService {
             throw new IllegalArgumentException("존재하지 않는 사용자입니다");
         }
 
-//        if (request.getEndDate().isBefore(request.getStartDate())) {
-//            throw new IllegalArgumentException("종료 일시는 시작 일시보다 이후여야 합니다");
-//        }
-//
-//        if (request.getStartDate().isBefore(LocalDateTime.now())) {
-//            throw new IllegalArgumentException("시작 일시는 현재 시간 이후여야 합니다");
-//        }
-
         log.info("투표 생성 요청 - Poll Request: {}, 요청자: {}", request, userId);
 
         Poll poll = new Poll();
@@ -92,16 +84,6 @@ public class PollService {
             throw new IllegalStateException("비활성화된 투표입니다");
         }
 
-//        LocalDateTime now = LocalDateTime.now();
-//        if (now.isBefore(poll.getStartDate())) {
-//            throw new IllegalStateException("투표가 아직 시작되지 않았습니다");
-//        }
-//
-//        if (now.isAfter(poll.getEndDate())) {
-//            throw new IllegalStateException("투표가 종료되었습니다");
-//        }
-
-
         PollOption option = pollOptionRepository.findById(request.getOptionId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 옵션입니다"));
 
@@ -109,12 +91,10 @@ public class PollService {
             throw new IllegalArgumentException("해당 투표의 옵션이 아닙니다");
         }
 
-        // 기존 투표 확인
         Optional<Vote> existingVote = voteRepository.findByPollIdAndUserId(
                 request.getPollId(), userId);
 
         if (existingVote.isPresent()) {
-            // 투표 변경
             if (!poll.getAllowChangeVote()) {
                 throw new IllegalStateException("투표 변경이 허용되지 않습니다");
             }
@@ -126,7 +106,6 @@ public class PollService {
             log.info("투표 변경 완료 - Vote ID: {}, User ID: {}, Option ID: {}",
                     vote.getId(), userId, option.getId());
         } else {
-            // 새 투표
             Vote newVote = new Vote();
             newVote.setPoll(poll);
             newVote.setPollOption(option);
